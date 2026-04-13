@@ -1,14 +1,31 @@
 // All theme-adjacent strings and colors live here.
-// When the jam theme drops, this is (ideally) the only file touched.
+// Jam theme: **MACHINES** — Gamedev.js Jam 2026.
+// Framing: "Derelict Engine" — the player is the last maintainer carrying
+// a live ember on a winch cable up through the internal shafts of a single
+// colossal stalled machine, to reignite the core at the top.
 //
-// Visual direction: "Ink & Ember".
-// The world is a 4-step cool grey ink-wash. The rope is the only warm
-// element on screen — a single ember orange. Reward through contrast.
+// Visual direction stays "Ink & Ember": the world is a 4-step cool grey
+// ink-wash of oiled iron, frosted gauge glass and oxidized copper; the
+// ember cable is the only warm element on screen. On victory the machine
+// reignites and the world re-colors for the first and only time.
 
 export const THEME = {
-  title: 'The Harness',
-  tagline: 'One rope. One life. One tower.',
-  heroName: 'Climber',
+  title: 'THE HARNESS',
+  tagline: 'one ember · one cable · reignite the core',
+  heroName: 'Maintainer',
+
+  framing: {
+    // Short blurb, used on the title card and README.
+    lore: 'Climb the dead machine. Reignite the core. One ember, one cable, one run.',
+    // 3 vertical biomes for M3's tower — the tile set keeps its stone / ice
+    // / moss palette slots, only the in-world names change.
+    biomes: {
+      iron: 'Boiler Hall',
+      glass: 'Gauge Shafts',
+      copper: 'Ignition Chamber',
+    },
+    finishLabel: 'IGNITION',
+  },
 
   palette: {
     // --- world (ink wash, cool greys) ---
@@ -48,10 +65,10 @@ export const THEME = {
 
   labels: {
     heightUnit: 'm',
-    heightLabel: 'HEIGHT',
-    startPrompt: 'CLICK · TAP · BEGIN',
-    winBanner: 'YOU REACHED THE TOP',
-    givenUpBanner: 'YOU LET GO',
+    heightLabel: 'DEPTH',
+    startPrompt: 'THE ENGINE IS COLD · CLIMB',
+    winBanner: 'CORE · REIGNITED',
+    givenUpBanner: 'EMBER · LOST',
     modeTap: 'TAP — beginner',
     modeAim: 'AIM — hold · drag · release',
   },

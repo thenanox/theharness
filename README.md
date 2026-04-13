@@ -1,12 +1,25 @@
 # The Harness
 
 A one-run rope-climbing platformer for **[Gamedev.js Jam 2026](https://itch.io/jam/gamedevjs-2026)**.
-Inspired by the Worms Ninja Rope and Jump King: a single life, a single rope,
-and a tower that wants you at the bottom.
+Theme: **MACHINES**.
 
-Visual direction: **"Ink & Ember"** — an ink-wash sumi-e world painted
-entirely in cool greys, where the rope is the only warm thing on screen.
-Easy to learn, hard to master.
+> **Climb a dead machine. Reignite the core. One ember, one cable, one run.**
+
+You are the last maintainer of a colossal engine that stopped turning a
+hundred years ago. The ignition chamber sits at the top of the stalled
+core, and you're carrying the last live ember on a winch cable — climb
+the machine's internal shafts, thread the cable through frozen boiler
+halls and dead gauge shafts, and reignite the core before your ember
+burns out.
+
+Inspired by the Worms Ninja Rope and Jump King: a single life, a single
+rope, and a tower that wants you at the bottom.
+
+Visual direction: **"Ink & Ember"** — a sumi-e ink-wash world of oiled
+iron, frosted gauge glass, and oxidized copper, where the ember cable is
+the only warm thing on screen. On ignition, the machine fires back up
+and the world re-colors for the first and only time. Easy to learn,
+hard to master.
 
 ## Play
 
@@ -113,6 +126,10 @@ picks it up.
 
 ## Challenges targeted
 
+- **Theme — MACHINES** — the harness itself is a mechanical winch + climbing
+  rig, and the entire level is the internals of a single dead machine the
+  player is trying to reignite. One ember cable is the only live machinery
+  on screen until the win-moment ignition reveal.
 - **Build it with Phaser** — Phaser 4 + Matter
 - **Open Source** — MIT licensed, public repo, gitleaks scans, `SECURITY.md`
 - **Deploy to Wavedash** — `WavedashJS` leaderboard integration (M5)

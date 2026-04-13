@@ -40,12 +40,15 @@ export class GameScene extends Phaser.Scene {
     this.matter.world.setGravity(0, PHYSICS.gravityY);
     this.matter.world.setBounds(0, -400, ARENA_W, ARENA_H + 400);
 
-    // Visual FX first — paper backdrop, parallax silhouettes, then geometry.
+    // Visual FX first — paper backdrop, machine parallax, then geometry.
+    // Parallax is the "Machines → Derelict Engine" variant: dead cogs +
+    // cold smokestacks behind the arena instead of abstract ink columns.
     this.fx = new VisualFX(this);
     this.fx.paintPaperBackdrop(ARENA_W, ARENA_H);
-    this.fx.paintParallaxSilhouettes(ARENA_W, ARENA_H);
+    this.fx.paintMachineParallax(ARENA_W, ARENA_H);
 
     this.buildArena(ARENA_W, ARENA_H);
+    this.paintArenaDecor(ARENA_W, ARENA_H);
 
     // Player + rope (with VisualFX wired for ember glow + ink splashes).
     this.player = new Player(this, 120, ARENA_H - 120);
@@ -99,7 +102,7 @@ export class GameScene extends Phaser.Scene {
       .text(
         this.scale.width / 2,
         14,
-        'M1 · INK & EMBER — click/tap to fire · W/S or ▲▼ reel · space to detach · A/D walk',
+        'M2.5 · DERELICT ENGINE — click/tap to cast cable · W/S or ▲▼ reel · space to detach · A/D walk',
         {
           fontFamily: 'monospace',
           fontSize: '12px',
@@ -151,12 +154,14 @@ export class GameScene extends Phaser.Scene {
     // A mid-air anchor pillar near the middle for tricky swings
     add(1100, 320, 32, 280, THEME.palette.stone, 907);
 
-    // A finish-line flag on the far right floor area — warm ember accent,
-    // the only other warm element besides the rope itself.
+    // Ignition trigger on the far right — the "finish line" narratively
+    // becomes the dead core socket where the player plugs in the ember
+    // cable to reignite the machine. Same rectangle + warm glow; an
+    // IGNITION gauge sits above it so the goal reads as machinery.
     const flag = this.add.rectangle(w - 80, h - 56, 16, 48, THEME.palette.accent);
     flag.setStrokeStyle(2, THEME.palette.inkDeep);
     void flag;
-    // Soft ember glow behind the flag so the eye lands on it.
+    // Soft ember glow behind the socket so the eye lands on it.
     const glow = this.add.circle(w - 80, h - 56, 26, THEME.palette.ropeGlow, 0.25).setDepth(-5);
     this.tweens.add({
       targets: glow,
@@ -165,6 +170,44 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
     });
+    // IGNITION label above the socket, ember tone.
+    this.add
+      .text(w - 80, h - 108, THEME.framing.finishLabel, {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#ff7a3d',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.9);
+  }
+
+  /**
+   * Scatter dead-machine decoration over the arena: rivets on the iron
+   * slabs, a couple of pipe runs between platforms, frozen gauge dials
+   * on the walls, and a steam vent near the ignition socket. All purely
+   * visual — no Matter bodies, no collision, no input cost.
+   */
+  private paintArenaDecor(w: number, h: number): void {
+    // Rivet rows along the top edge of the floor and along the ceiling.
+    this.fx.paintRivetRow(w / 2, h - 30, w - 120, 1103);
+    this.fx.paintRivetRow(w / 2, 30, w - 120, 1207);
+
+    // Pipe runs connecting the ceiling platforms — feels like the machine
+    // once carried steam from boiler to ignition chamber.
+    this.fx.paintPipeRun(530, 168, 810, 128, 1301);
+    this.fx.paintPipeRun(990, 128, 1270, 188, 1303);
+    this.fx.paintPipeRun(1430, 188, 1660, 148, 1307);
+
+    // Frozen gauge dials on the side walls — small, subtle.
+    this.fx.paintGaugeDial(56, 120, 14, 1409);
+    this.fx.paintGaugeDial(56, 260, 12, 1411);
+    this.fx.paintGaugeDial(56, 400, 16, 1413);
+    this.fx.paintGaugeDial(w - 56, 240, 14, 1415);
+    this.fx.paintGaugeDial(w - 56, 420, 12, 1417);
+
+    // Dead steam vent near the ignition socket.
+    this.fx.paintSteamVent(w - 120, h - 60, 1503);
+    this.fx.paintSteamVent(w - 48, h - 80, 1507);
   }
 
   update(_t: number, deltaMs: number): void {

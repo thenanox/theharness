@@ -119,6 +119,196 @@ export class VisualFX {
     g.fillRoundedRect(cx - dripW / 2, baseY - height - dripH + 4, dripW, dripH, dripW * 0.4);
   }
 
+  // ----- machine decoration (theme: MACHINES / Derelict Engine) -----
+
+  /**
+   * Parallax replacement for the Machines build — two layers of giant
+   * dead gears and smokestacks rendered as brushstroke silhouettes.
+   * Same scroll factors as paintParallaxSilhouettes; both can coexist.
+   */
+  paintMachineParallax(worldW: number, worldH: number): void {
+    this.reseed(5279);
+    const farLayer = this.scene.add.graphics().setDepth(-80).setScrollFactor(0.3, 0.8);
+    const nearLayer = this.scene.add.graphics().setDepth(-60).setScrollFactor(0.6, 0.9);
+
+    // Far: tall smokestacks in pale ink. Cold — no smoke.
+    farLayer.fillStyle(THEME.palette.inkGhost, 0.42);
+    const stackCount = Math.ceil(worldW / 160);
+    for (let i = 0; i < stackCount; i++) {
+      const cx = i * 160 + this.rng() * 60;
+      const w = 44 + this.rng() * 22;
+      const h = 200 + this.rng() * 240;
+      this.drawSmokestack(farLayer, cx, worldH - 40, w, h);
+    }
+
+    // Near: a handful of huge dead cog silhouettes behind the arena.
+    const cogCount = Math.ceil(worldW / 380);
+    for (let i = 0; i < cogCount; i++) {
+      const cx = i * 380 + 140 + this.rng() * 90;
+      const cy = worldH - 120 - this.rng() * 220;
+      const r = 70 + this.rng() * 60;
+      this.paintGearSilhouette(cx, cy, r, nearLayer, THEME.palette.inkSoft, 0.55);
+    }
+  }
+
+  /**
+   * A single smokestack — wider base, narrow neck, little cap.
+   * Used by paintMachineParallax for the far layer.
+   */
+  private drawSmokestack(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    baseY: number,
+    width: number,
+    height: number,
+  ): void {
+    const body = width * 0.75;
+    g.fillRoundedRect(cx - body / 2, baseY - height, body, height, body * 0.18);
+    // flared cap
+    const cap = width;
+    g.fillRoundedRect(cx - cap / 2, baseY - height - 8, cap, 10, 3);
+    // faint soot drip on one side
+    const dripH = 10 + this.rng() * 8;
+    g.fillRoundedRect(cx + body / 2 - 2, baseY - height + 12, 2, dripH, 1);
+  }
+
+  /**
+   * Brushstroke cog outline — 8–12 teeth, a hub, an axle hole.
+   * Paints into the given Graphics (so it can go in a parallax layer)
+   * or creates its own if none is passed. Deterministic per-seed.
+   */
+  paintGearSilhouette(
+    cx: number,
+    cy: number,
+    radius: number,
+    into?: Phaser.GameObjects.Graphics,
+    color: number = THEME.palette.inkSoft,
+    alpha: number = 0.7,
+  ): Phaser.GameObjects.Graphics {
+    const g = into ?? this.scene.add.graphics().setDepth(-8);
+    g.fillStyle(color, alpha);
+
+    const teeth = 10;
+    const inner = radius * 0.78;
+    const outer = radius;
+    // Draw teeth as a stacked ring of small rects rotated around the center.
+    for (let i = 0; i < teeth; i++) {
+      const a = (i / teeth) * Math.PI * 2;
+      const tx = cx + Math.cos(a) * outer;
+      const ty = cy + Math.sin(a) * outer;
+      g.fillCircle(tx, ty, radius * 0.13);
+    }
+    // Main disk
+    g.fillCircle(cx, cy, inner);
+    // Axle hole punched as background paint
+    g.fillStyle(THEME.palette.background, alpha * 0.9);
+    g.fillCircle(cx, cy, radius * 0.22);
+    // Single arm across the hub for detail
+    g.fillStyle(color, alpha);
+    g.fillRect(cx - inner * 0.9, cy - 1.5, inner * 1.8, 3);
+
+    return g;
+  }
+
+  /**
+   * A horizontal row of rivets — 4-7 small dark dots evenly spaced across
+   * the top or bottom edge of an iron slab. Call after paintBrushSlab.
+   */
+  paintRivetRow(x: number, y: number, w: number, seed = 0): void {
+    if (seed) this.reseed(seed);
+    const g = this.scene.add.graphics().setDepth(-9);
+    g.fillStyle(THEME.palette.inkDeep, 0.85);
+    const count = Math.max(3, Math.round(w / 40));
+    const pad = 8;
+    for (let i = 0; i < count; i++) {
+      const rx = x - w / 2 + pad + ((w - pad * 2) * i) / Math.max(1, count - 1);
+      g.fillCircle(rx, y, 1.8);
+      // thin highlight dot
+      g.fillStyle(THEME.palette.inkGhost, 0.5);
+      g.fillCircle(rx - 0.6, y - 0.6, 0.7);
+      g.fillStyle(THEME.palette.inkDeep, 0.85);
+    }
+  }
+
+  /**
+   * A dead pipe run between two anchor points. Two parallel ink strokes
+   * plus a single hot-white highlight streak. Purely decorative.
+   */
+  paintPipeRun(x1: number, y1: number, x2: number, y2: number, seed = 0): void {
+    if (seed) this.reseed(seed);
+    const g = this.scene.add.graphics().setDepth(-7);
+    // outer stroke
+    g.lineStyle(6, THEME.palette.inkMid, 0.85);
+    g.lineBetween(x1, y1, x2, y2);
+    // inner stroke (creates the "pipe" double-line feel)
+    g.lineStyle(3, THEME.palette.inkSoft, 0.9);
+    g.lineBetween(x1, y1, x2, y2);
+    // hot-white highlight along one side
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    g.lineStyle(1, 0xf4efe6, 0.9);
+    g.lineBetween(x1 + nx * 0.8, y1 + ny * 0.8, x2 + nx * 0.8, y2 + ny * 0.8);
+    // joint caps
+    g.fillStyle(THEME.palette.inkDeep, 0.9);
+    g.fillCircle(x1, y1, 4);
+    g.fillCircle(x2, y2, 4);
+  }
+
+  /**
+   * Frozen gauge dial — an ink circle with tick marks and a single
+   * dead ember needle. Decoration only; no interaction.
+   */
+  paintGaugeDial(x: number, y: number, r: number, seed = 0): void {
+    if (seed) this.reseed(seed);
+    const g = this.scene.add.graphics().setDepth(-7);
+    // bezel
+    g.fillStyle(THEME.palette.inkDeep, 0.9);
+    g.fillCircle(x, y, r + 2);
+    // face
+    g.fillStyle(THEME.palette.background, 0.95);
+    g.fillCircle(x, y, r);
+    // tick marks
+    g.lineStyle(1, THEME.palette.inkMid, 0.85);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+      const ix = x + Math.cos(a) * (r - 4);
+      const iy = y + Math.sin(a) * (r - 4);
+      const ox = x + Math.cos(a) * (r - 1);
+      const oy = y + Math.sin(a) * (r - 1);
+      g.lineBetween(ix, iy, ox, oy);
+    }
+    // frozen needle — points down-left, dead
+    const na = Math.PI * (0.85 + this.rng() * 0.25);
+    const nxp = x + Math.cos(na) * (r - 3);
+    const nyp = y + Math.sin(na) * (r - 3);
+    g.lineStyle(1.5, THEME.palette.ember, 0.7);
+    g.lineBetween(x, y, nxp, nyp);
+    g.fillStyle(THEME.palette.inkDeep, 1);
+    g.fillCircle(x, y, 1.5);
+  }
+
+  /**
+   * A small wall-mounted steam vent — a dead slit in the ink.
+   * On the win-color-reveal this could optionally emit a warm puff
+   * but for now it's static decoration.
+   */
+  paintSteamVent(x: number, y: number, seed = 0): void {
+    if (seed) this.reseed(seed);
+    const g = this.scene.add.graphics().setDepth(-7);
+    g.fillStyle(THEME.palette.inkDeep, 0.9);
+    g.fillRoundedRect(x - 10, y - 4, 20, 8, 2);
+    // internal slit
+    g.fillStyle(THEME.palette.background, 0.85);
+    g.fillRect(x - 8, y - 1, 16, 2);
+    // two faint ember traces suggesting this vent was once hot
+    g.fillStyle(THEME.palette.ember, 0.45);
+    g.fillCircle(x - 4, y - 6 - this.rng() * 2, 1);
+    g.fillCircle(x + 3, y - 9 - this.rng() * 2, 1);
+  }
+
   // ----- brushstroke tile / slab -----
 
   /**
