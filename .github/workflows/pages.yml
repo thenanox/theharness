@@ -1,0 +1,115 @@
+name: Deploy preview to GitHub Pages
+
+# Every push and every PR produces a playable URL within ~2 minutes.
+# Layout on the gh-pages branch:
+#   /                 (production — pushes to `main`)
+#   /branch/<name>/   (pushes to any other branch)
+#   /pr/<number>/     (pull requests from the same repo)
+#
+# Uses peaceiris/actions-gh-pages instead of actions/deploy-pages so we can
+# publish multiple subfolders to the same site without wiping each other.
+
+on:
+  push:
+    branches:
+      - '**'
+      - '!gh-pages'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write        # to push to gh-pages branch
+  pull-requests: write   # to comment on PRs
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Compute the deploy slug and VITE_BASE from the event context.
+      - name: Resolve deploy slug
+        id: slug
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            SLUG="pr/${{ github.event.pull_request.number }}"
+            KIND="pr"
+          elif [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            SLUG=""
+            KIND="production"
+          else
+            # Sanitize branch name for use as a URL path segment.
+            SAFE="$(printf '%s' "${GITHUB_REF_NAME}" | tr '/' '-' | tr -cd 'a-zA-Z0-9._-')"
+            SLUG="branch/${SAFE}"
+            KIND="branch"
+          fi
+
+          if [[ -n "${SLUG}" ]]; then
+            VITE_BASE="/${REPO_NAME}/${SLUG}/"
+          else
+            VITE_BASE="/${REPO_NAME}/"
+          fi
+
+          PREVIEW_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io${VITE_BASE}"
+
+          {
+            echo "slug=${SLUG}"
+            echo "kind=${KIND}"
+            echo "vite_base=${VITE_BASE}"
+            echo "preview_url=${PREVIEW_URL}"
+            echo "repo_name=${REPO_NAME}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_BASE: ${{ steps.slug.outputs.vite_base }}
+
+      # Publish to gh-pages at the resolved subfolder. keep_files: true so
+      # previews from sibling branches/PRs aren't wiped by this deploy.
+      - name: Deploy to gh-pages
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: ${{ steps.slug.outputs.slug }}
+          keep_files: true
+          commit_message: 'deploy: ${{ steps.slug.outputs.kind }} ${{ github.sha }}'
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+
+      # Sticky comment on PRs pointing at the preview URL.
+      - name: Comment preview URL on PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-url
+          message: |
+            Preview for this PR will be live at:
+
+            **${{ steps.slug.outputs.preview_url }}**
+
+            Allow ~1-2 minutes after the workflow finishes for GitHub Pages
+            to pick up the new files. Mobile testers: open the link on your
+            phone (landscape recommended).
+
+      - name: Summary
+        run: |
+          echo "### Preview ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "- kind: **${{ steps.slug.outputs.kind }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- url: ${{ steps.slug.outputs.preview_url }}" >> "$GITHUB_STEP_SUMMARY"

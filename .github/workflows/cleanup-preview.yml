@@ -1,0 +1,58 @@
+name: Cleanup preview
+
+# Removes stale /branch/<name>/ and /pr/<n>/ subfolders from the gh-pages
+# branch when a branch is deleted or a PR is closed. Keeps the deployment
+# site from growing forever.
+
+on:
+  delete:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-cleanup
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'delete' && github.event.ref_type == 'branch')
+
+    steps:
+      - name: Checkout gh-pages
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+          # If gh-pages doesn't exist yet, don't fail — just exit early below.
+
+      - name: Resolve target folder
+        id: target
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "path=pr/${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            SAFE="$(printf '%s' "${{ github.event.ref }}" | tr '/' '-' | tr -cd 'a-zA-Z0-9._-')"
+            echo "path=branch/${SAFE}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Remove subfolder and push
+        run: |
+          TARGET="${{ steps.target.outputs.path }}"
+          if [[ ! -d "${TARGET}" ]]; then
+            echo "Nothing to clean at ${TARGET}"
+            exit 0
+          fi
+
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git rm -rf "${TARGET}"
+          git commit -m "cleanup: prune ${TARGET}"
+          git push origin gh-pages
