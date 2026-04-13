@@ -25,12 +25,12 @@ jobs:
 
     steps:
       - name: Checkout gh-pages
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           ref: gh-pages
           fetch-depth: 1
           # If gh-pages doesn't exist yet, don't fail — just exit early below.
-          continue-on-error: true
 
       - name: Resolve target folder
         id: target
