@@ -1,0 +1,4 @@
+# Wavedash deploy config — see https://docs.wavedash.com/
+# Deploy with: npm run build && wavedash build push
+game_id = "the-harness"
+upload_dir = "./dist"

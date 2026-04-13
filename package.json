@@ -1,0 +1,21 @@
+{
+  "name": "theharness",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "The Harness — a one-run rope-climbing platformer for Gamedev.js Jam 2026",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "phaser": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0"
+  }
+}
