@@ -83,18 +83,20 @@ export class Player {
     const now = this.scene.time.now;
     const grounded = this.isGrounded(now);
 
-    // Horizontal control: stronger on ground, soft nudge in air.
+    // Horizontal control: stronger on ground, swing pump on rope, soft drift in air.
     const walkVx = 3.2;
-    const airAccel = 0.0008;
     if (grounded && !isSwinging) {
       if (input.left) this.setVelocity(-walkVx, this.body.velocity.y);
       else if (input.right) this.setVelocity(walkVx, this.body.velocity.y);
       else this.setVelocity(this.body.velocity.x * 0.6, this.body.velocity.y);
     } else {
-      // Air / swing nudge — applies force without clobbering rope pendulum.
+      // Swinging: strong horizontal pump so A/D meaningfully adds pendulum
+      // energy (the Worms "kick to swing higher" move). Free-fall air nudge
+      // stays subtle so you can't just fly sideways without a rope.
       const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
       if (fx !== 0) {
-        this.applyForce(fx * airAccel, 0);
+        const accel = isSwinging ? 0.006 : 0.0012;
+        this.applyForce(fx * accel, 0);
       }
     }
 
