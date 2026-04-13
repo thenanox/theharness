@@ -13,6 +13,7 @@ on:
   push:
     branches:
       - '**'
+      - '!gh-pages'
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -81,6 +82,7 @@ jobs:
       # Publish to gh-pages at the resolved subfolder. keep_files: true so
       # previews from sibling branches/PRs aren't wiped by this deploy.
       - name: Deploy to gh-pages
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -93,7 +95,7 @@ jobs:
 
       # Sticky comment on PRs pointing at the preview URL.
       - name: Comment preview URL on PR
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: preview-url
