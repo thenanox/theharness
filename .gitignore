@@ -1,7 +1,59 @@
-node_modules
-dist
-.env
-.env.local
-.DS_Store
+# --- dependencies & build output ---
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# --- logs ---
 *.log
-.vite
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- environment & secrets (NEVER commit these) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+secrets.json
+credentials.json
+
+# --- tooling credentials ---
+.wrangler/
+.wavedash/
+.itch/
+.netlify/
+.vercel/
+
+# --- os cruft ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# --- editors ---
+.idea/
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
+*.swp
+*.swo
+.history/
+
+# --- packaged builds ---
+*.zip
+*.tar.gz
+harness.zip
+
+# --- optional test / coverage output ---
+.nyc_output/
+playwright-report/
+test-results/

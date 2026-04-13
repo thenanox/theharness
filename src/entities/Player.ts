@@ -10,18 +10,33 @@ type MatterBody = MatterJS.BodyType;
  * The climber. A single capsule-ish box body with rotation locked
  * (inertia: Infinity). Walks when grounded, nudges when airborne,
  * jumps on press. All swinging is done by the Rope via a constraint.
+ *
+ * Visually: a charcoal ink silhouette with a single ember accent line
+ * (the harness belt) so the player reads against the cool-grey world.
+ * The sprite is a Phaser.Container holding:
+ *   - body rect (ink)
+ *   - belt rect (ember)
+ *   - head dot (ink)
+ * Only the body rect participates in Matter physics.
  */
 export class Player {
   readonly scene: Phaser.Scene;
   readonly gfx: Phaser.GameObjects.Rectangle;
   readonly body: MatterBody;
+  readonly dressing: Phaser.GameObjects.Container;
+
+  private beltRect: Phaser.GameObjects.Rectangle;
+  private headDot: Phaser.GameObjects.Arc;
 
   private lastGroundedAt = 0;
+  private lastVyForLanding = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
 
+    // Physics body — invisible shape, the physical truth.
     this.gfx = scene.add.rectangle(x, y, 20, 28, THEME.palette.player);
+    this.gfx.setDepth(10);
     scene.matter.add.gameObject(this.gfx, {
       mass: PHYSICS.player.mass,
       frictionAir: PHYSICS.player.frictionAir,
@@ -31,9 +46,13 @@ export class Player {
       inertia: Infinity, // lock rotation — feels better for aim
       label: 'player',
     } as Phaser.Types.Physics.Matter.MatterBodyConfig);
-
-    // After gameObject(), the rectangle has a .body we can grab.
     this.body = (this.gfx as unknown as { body: MatterBody }).body;
+
+    // Dressing: ember belt + head dot. Drawn over the body rect.
+    // Stored in a Container so we can follow the physics body each frame.
+    this.beltRect = scene.add.rectangle(0, 4, 22, 3, THEME.palette.playerAccent).setDepth(11);
+    this.headDot = scene.add.circle(0, -11, 4, THEME.palette.player).setDepth(11);
+    this.dressing = scene.add.container(x, y, [this.beltRect, this.headDot]).setDepth(11);
   }
 
   get x(): number {
@@ -43,8 +62,15 @@ export class Player {
     return this.body.position.y;
   }
 
+  /** How hard the player hit the ground on the most recent grounded frame. */
+  get lastLandingVelocity(): number {
+    return this.lastVyForLanding;
+  }
+
   /** Called from the scene's `matter world collision` listener. */
   markGrounded(now: number): void {
+    // Cache pre-landing vy so FX systems can decide on dust puffs.
+    this.lastVyForLanding = this.body.velocity.y;
     this.lastGroundedAt = now;
   }
 
@@ -86,10 +112,12 @@ export class Player {
       const s = vmax / speed;
       this.setVelocity(v.x * s, v.y * s);
     }
+
+    // Sync the dressing container to the body's current position.
+    this.dressing.setPosition(this.x, this.y);
   }
 
   private setVelocity(x: number, y: number): void {
-    // Phaser 4 exposes the raw Matter.Body namespace as `matter.body`.
     (this.scene.matter as unknown as { body: { setVelocity: (b: MatterBody, v: { x: number; y: number }) => void } }).body.setVelocity(this.body, { x, y });
   }
 

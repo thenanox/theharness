@@ -1,0 +1,29 @@
+name: Gitleaks secret scan
+
+# Blocks pushes and PRs that accidentally introduce API keys, private keys,
+# wallet seeds, or other credentials. Free on public repos.
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          # GITLEAKS_LICENSE is required for org accounts but NOT for public
+          # repos on personal accounts — so we intentionally leave it unset.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

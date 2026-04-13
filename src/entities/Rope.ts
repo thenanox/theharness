@@ -4,6 +4,7 @@ import { THEME } from '../theme';
 import type { RopeState } from '../types';
 import type { Player } from './Player';
 import type { InputState } from '../systems/InputController';
+import type { VisualFX } from '../systems/VisualFX';
 
 type MatterBody = MatterJS.BodyType;
 type MatterConstraint = MatterJS.ConstraintType;
@@ -26,6 +27,7 @@ interface RayHit {
 export class Rope {
   private scene: Phaser.Scene;
   private player: Player;
+  private fx?: VisualFX;
 
   state: RopeState = 'IDLE';
   private length = 0;
@@ -34,18 +36,25 @@ export class Rope {
   private anchorBody?: MatterBody;
   private anchorLocal?: { x: number; y: number };
 
-  private gfx: Phaser.GameObjects.Graphics;
+  // Two Graphics objects so we can do a cheap two-pass glow:
+  //   glowGfx = outer soft ember + mid ember (additive-ish via alpha)
+  //   coreGfx = hot-white core line
+  private glowGfx: Phaser.GameObjects.Graphics;
+  private coreGfx: Phaser.GameObjects.Graphics;
   private hookGfx: Phaser.GameObjects.Arc;
   private fireTween?: Phaser.Tweens.Tween;
 
-  constructor(scene: Phaser.Scene, player: Player) {
+  constructor(scene: Phaser.Scene, player: Player, fx?: VisualFX) {
     this.scene = scene;
     this.player = player;
-    this.gfx = scene.add.graphics().setDepth(5);
+    this.fx = fx;
+    this.glowGfx = scene.add.graphics().setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
+    this.coreGfx = scene.add.graphics().setDepth(6);
     this.hookGfx = scene.add
-      .circle(0, 0, 4, THEME.palette.ropeHook)
+      .circle(0, 0, 3, THEME.palette.ropeHook)
+      .setStrokeStyle(1.5, THEME.palette.ropeGlow, 0.8)
       .setVisible(false)
-      .setDepth(6);
+      .setDepth(7);
   }
 
   isBusy(): boolean {
@@ -90,6 +99,13 @@ export class Rope {
 
   private attach(hit: RayHit): void {
     this.state = 'ATTACHED';
+
+    // Ink splash on stick — only if VisualFX was wired in.
+    this.fx?.inkSplash(hit.point.x, hit.point.y, 8);
+    // Subtle haptic — mobile devices only, silently noop elsewhere.
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(8);
+    }
 
     this.anchorBody = hit.body;
     this.anchorLocal = {
@@ -141,6 +157,12 @@ export class Rope {
       // Outward-along-rope nudge so you don't get yanked back.
       const kick = PHYSICS.rope.detachImpulse;
       this.applyForce((dx / d) * kick, (dy / d) * kick - kick * 0.5);
+
+      // Ember flicker + haptic on release.
+      this.fx?.emberFlicker(this.player.x, this.player.y);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(6);
+      }
     }
 
     this.anchorBody = undefined;
@@ -165,21 +187,37 @@ export class Rope {
   }
 
   private draw(): void {
-    this.gfx.clear();
+    this.glowGfx.clear();
+    this.coreGfx.clear();
     if (this.state === 'SWINGING' && this.anchorBody && this.anchorLocal) {
       const ax = this.anchorBody.position.x + this.anchorLocal.x;
       const ay = this.anchorBody.position.y + this.anchorLocal.y;
-      this.gfx.lineStyle(2, THEME.palette.rope, 1);
-      this.gfx.lineBetween(this.player.x, this.player.y, ax, ay);
+      if (this.fx) {
+        this.fx.drawEmberRope(this.glowGfx, this.coreGfx, this.player.x, this.player.y, ax, ay);
+      } else {
+        this.coreGfx.lineStyle(2, THEME.palette.rope, 1);
+        this.coreGfx.lineBetween(this.player.x, this.player.y, ax, ay);
+      }
     } else if (this.state === 'FIRING') {
-      this.gfx.lineStyle(2, THEME.palette.rope, 0.8);
-      this.gfx.lineBetween(this.player.x, this.player.y, this.hookGfx.x, this.hookGfx.y);
+      if (this.fx) {
+        this.fx.drawEmberRope(
+          this.glowGfx,
+          this.coreGfx,
+          this.player.x,
+          this.player.y,
+          this.hookGfx.x,
+          this.hookGfx.y,
+        );
+      } else {
+        this.coreGfx.lineStyle(2, THEME.palette.rope, 0.8);
+        this.coreGfx.lineBetween(this.player.x, this.player.y, this.hookGfx.x, this.hookGfx.y);
+      }
     }
   }
 
   private flashMiss(sx: number, sy: number, ex: number, ey: number): void {
     const g = this.scene.add.graphics().setDepth(5);
-    g.lineStyle(1, THEME.palette.rope, 0.3);
+    g.lineStyle(1, THEME.palette.inkGhost, 0.35);
     g.lineBetween(sx, sy, ex, ey);
     this.scene.tweens.add({
       targets: g,

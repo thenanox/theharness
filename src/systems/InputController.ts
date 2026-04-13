@@ -3,7 +3,18 @@ import * as Phaser from 'phaser';
 /**
  * Frame-stable input snapshot. Consumers read the `state` each update;
  * the controller clears one-shot flags (pressed/released) after reads.
+ *
+ * Mobile supports two control modes:
+ *   - 'tap' : a single tap fires the rope at the tap point. Ultra-easy.
+ *   - 'aim' : hold (>= HOLD_AIM_MS) to reveal an aim preview, drag to
+ *             tune, release to fire at the final drag point. Quick taps
+ *             still snap-fire — so Tap-mode muscle memory is preserved.
+ *
+ * Desktop always uses cursor-aim fire-on-click. The mode only matters on
+ * touch devices where there's no persistent pointer position.
  */
+export type TouchMode = 'tap' | 'aim';
+
 export interface InputState {
   // Aim
   aimX: number;
@@ -17,7 +28,20 @@ export interface InputState {
   firePressed: boolean;
   jumpPressed: boolean;
   detachPressed: boolean;
+  // Preview: true when the player is currently holding a pre-aim drag
+  // (mobile Aim mode only). The scene uses this to draw the aim guide.
+  aiming: boolean;
 }
+
+interface TouchZone {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const HOLD_AIM_MS = 110;
+const TOUCH_MODE_KEY = 'harness.touchMode';
 
 export class InputController {
   private scene: Phaser.Scene;
@@ -33,6 +57,14 @@ export class InputController {
     SPACE: Phaser.Input.Keyboard.Key;
   };
 
+  private touchZones: TouchZone[] = [];
+
+  /** Mobile-only aim state for pre-aim drag. */
+  private dragStartAt = 0;
+  private dragPointerId: number | null = null;
+  private dragResolvedAsAim = false;
+  touchMode: TouchMode = 'tap';
+
   readonly state: InputState = {
     aimX: 0,
     aimY: 0,
@@ -43,10 +75,13 @@ export class InputController {
     firePressed: false,
     jumpPressed: false,
     detachPressed: false,
+    aiming: false,
   };
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+    this.loadTouchMode();
+
     const kb = scene.input.keyboard!;
     this.keys = {
       A: kb.addKey('A'),
@@ -61,9 +96,64 @@ export class InputController {
     };
 
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (p.leftButtonDown()) this.state.firePressed = true;
-      if (p.rightButtonDown()) this.state.detachPressed = true;
+      if (this.isOverTouchZone(p.x, p.y)) return;
+
+      // Desktop right-click: always hard detach.
+      if (p.rightButtonDown()) {
+        this.state.detachPressed = true;
+        return;
+      }
+
+      if (this.isTouchDevice() && this.touchMode === 'aim') {
+        // Start a pre-aim drag; fire is resolved on pointerup.
+        this.dragStartAt = scene.time.now;
+        this.dragPointerId = p.id;
+        this.dragResolvedAsAim = false;
+        this.state.aimX = p.worldX;
+        this.state.aimY = p.worldY;
+        return;
+      }
+
+      // Default (desktop click or mobile tap mode): fire at pointer.
+      if (p.leftButtonDown()) {
+        this.state.aimX = p.worldX;
+        this.state.aimY = p.worldY;
+        this.state.firePressed = true;
+      }
     });
+
+    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (this.dragPointerId !== null && p.id === this.dragPointerId) {
+        this.state.aimX = p.worldX;
+        this.state.aimY = p.worldY;
+        if (!this.dragResolvedAsAim && scene.time.now - this.dragStartAt >= HOLD_AIM_MS) {
+          this.dragResolvedAsAim = true;
+          this.state.aiming = true;
+        }
+      }
+    });
+
+    scene.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (this.dragPointerId !== null && p.id === this.dragPointerId) {
+        this.state.aimX = p.worldX;
+        this.state.aimY = p.worldY;
+        // Release is a fire regardless of aim/quick-tap — the scene decides
+        // whether it's a fire or a detach based on rope state.
+        this.state.firePressed = true;
+        this.state.aiming = false;
+        this.dragPointerId = null;
+        this.dragResolvedAsAim = false;
+      }
+    });
+
+    scene.input.on('pointerupoutside', (p: Phaser.Input.Pointer) => {
+      if (this.dragPointerId !== null && p.id === this.dragPointerId) {
+        this.dragPointerId = null;
+        this.dragResolvedAsAim = false;
+        this.state.aiming = false;
+      }
+    });
+
     // Prevent right-click context menu stealing the detach input.
     scene.input.mouse?.disableContextMenu();
 
@@ -81,11 +171,62 @@ export class InputController {
     });
   }
 
+  /** Called by TouchControls so tap-to-fire ignores taps on buttons. */
+  registerTouchZone(x: number, y: number, w: number, h: number): void {
+    this.touchZones.push({ x, y, w, h });
+  }
+
+  setTouchMode(mode: TouchMode): void {
+    this.touchMode = mode;
+    try {
+      localStorage.setItem(TOUCH_MODE_KEY, mode);
+    } catch {
+      // localStorage may be unavailable (private browsing, itch iframe). ignore.
+    }
+  }
+
+  toggleTouchMode(): TouchMode {
+    this.setTouchMode(this.touchMode === 'tap' ? 'aim' : 'tap');
+    return this.touchMode;
+  }
+
+  private loadTouchMode(): void {
+    try {
+      const saved = localStorage.getItem(TOUCH_MODE_KEY);
+      if (saved === 'tap' || saved === 'aim') this.touchMode = saved;
+    } catch {
+      // ignore
+    }
+  }
+
+  isTouchDevice(): boolean {
+    return (
+      this.scene.sys.game.device.input.touch ||
+      new URLSearchParams(window.location.search).has('touch')
+    );
+  }
+
+  private isOverTouchZone(screenX: number, screenY: number): boolean {
+    for (const z of this.touchZones) {
+      if (screenX >= z.x && screenX <= z.x + z.w && screenY >= z.y && screenY <= z.y + z.h) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Read per-frame. Call once per update, before consumers. */
   sample(): void {
-    const ptr = this.scene.input.activePointer;
-    this.state.aimX = ptr.worldX;
-    this.state.aimY = ptr.worldY;
+    // Only desktop uses the live pointer as the aim. Mobile tracks
+    // aimX/Y via pointerdown/move/up so a finger that left the screen
+    // doesn't instantly snap the aim.
+    if (!this.isTouchDevice() || this.dragPointerId === null) {
+      const ptr = this.scene.input.activePointer;
+      if (!this.isTouchDevice()) {
+        this.state.aimX = ptr.worldX;
+        this.state.aimY = ptr.worldY;
+      }
+    }
 
     this.state.left = this.keys.A.isDown || this.keys.LEFT.isDown;
     this.state.right = this.keys.D.isDown || this.keys.RIGHT.isDown;
