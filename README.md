@@ -25,8 +25,15 @@ hard to master.
 
 - **Production (main)**: https://thenanox.github.io/theharness/
 - **Current jam branch**: https://thenanox.github.io/theharness/branch/claude-phaser-gamedevjs-jam-uuknr/
+- **PR #2 preview**: https://thenanox.github.io/theharness/pr/2/
 - itch.io: _coming soon_
 - Wavedash: _coming soon_
+
+> ⚠️ **Are the links above 404?** GitHub Pages has to be enabled once by
+> hand before any of the preview URLs resolve — the workflow already
+> publishes the built game to the `gh-pages` branch, but GitHub won't
+> serve anything until Pages is switched on. See **First-time setup**
+> below. It takes 20 seconds.
 
 ### Iteration loop — every commit is playable
 
@@ -45,15 +52,23 @@ a branch is deleted or a PR is closed.
 
 Allow ~1-2 minutes after a push for the deployment to go live.
 
-### First-time setup (repo owner, one-time)
+### First-time setup (repo owner, one-time, **REQUIRED**)
 
-1. **Settings → Pages** → **Source: Deploy from a branch** → select
-   `gh-pages` and `/` (root). The branch is created by the first
-   workflow run, so push any commit first and then revisit this screen.
-2. **Settings → Actions → General → Workflow permissions**:
-   enable **Read and write permissions**.
+Until these two toggles are flipped, every preview URL will return 404
+even though the workflow is publishing files correctly.
 
-The workflows use only `GITHUB_TOKEN` — there are no secrets to configure.
+1. **Enable Pages**: go to
+   [Settings → Pages](https://github.com/thenanox/theharness/settings/pages)
+   → **Source: Deploy from a branch** → pick branch **`gh-pages`** and
+   folder **`/ (root)`** → **Save**. The `gh-pages` branch is already
+   populated by the first workflow run, so you can do this now.
+2. **Allow workflow writes**: go to
+   [Settings → Actions → General](https://github.com/thenanox/theharness/settings/actions)
+   → **Workflow permissions** → **Read and write permissions** → Save.
+
+Within ~1 minute of saving step 1, `https://thenanox.github.io/theharness/pr/2/`
+and every other preview URL in the table above will start serving the game.
+The workflows use only `GITHUB_TOKEN` — no secrets to configure.
 
 ## Controls
 
