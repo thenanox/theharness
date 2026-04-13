@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="description" content="The Harness — a one-run rope-climbing platformer for Gamedev.js Jam 2026" />
+    <meta name="theme-color" content="#f4efe6" />
+    <title>The Harness</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        /* "Ink & Ember" paper-white so the game canvas blends with the page */
+        background: #f4efe6;
+        color: #1b1c21;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow: hidden;
+        height: 100%;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      #game-container {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: none;      /* don't let browser steal touch gestures */
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+      canvas {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      /* Rotate-device hint for portrait phones. Hidden by default;
+         CSS media query flips it on. Game keeps running underneath. */
+      #rotate-hint {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: #f4efe6ee;
+        color: #1b1c21;
+        font-size: 16px;
+        letter-spacing: 0.04em;
+        z-index: 9999;
+        text-align: center;
+        padding: 24px;
+      }
+      @media (orientation: portrait) and (max-width: 900px) {
+        #rotate-hint { display: flex; }
+      }
+    </style>
+    <script type="module" crossorigin src="/theharness/branch/claude-phaser-gamedevjs-jam-uuknr/assets/index-DfIxdD6X.js"></script>
+    <link rel="modulepreload" crossorigin href="/theharness/branch/claude-phaser-gamedevjs-jam-uuknr/assets/phaser-DQYafuF8.js">
+  </head>
+  <body>
+    <div id="game-container"></div>
+    <div id="rotate-hint">
+      <div>
+        <p>The Harness plays in landscape.</p>
+        <p>↻ rotate your phone.</p>
+      </div>
+    </div>
+  </body>
+</html>
