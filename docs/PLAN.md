@@ -25,20 +25,24 @@ The core design hook: a **one-run Jump King-style vertical climber** where the o
 | M2.5 — Machines theme | **done** | `theme.ts` labels, VisualFX machine props, README tagline |
 | M3.5 — branch/PR previews | **done** | `pages.yml` + cleanup workflow + sticky PR comment |
 | M4 — Ink & Ember visual pass | **done** | Brushstroke tiles, ember glow, parallax, particles, mobile dual-mode controls |
-| M2 — camera + height HUD | partial | Camera follow in, formal height meter pending |
-| M3 — full tower (Tiled map) | **pending** | Flat arena only; hand-authored map not started |
+| M4.5 — Portrait pivot + rope tests | **done** | 480×854 portrait layout, RopeStateMachine extracted, vitest suite added |
+| M2 — camera + height HUD | partial | Vertical camera follow in; formal height meter pending |
+| M3 — full tower (Tiled map) | **pending** | Tall vertical arena stub in; hand-authored Tiled map not started |
 | M5 — persistence + Wavedash | **pending** | SaveStore, WavedashAdapter not yet built |
 | M6 — multi-target deploy | **pending** | itch.io and Wavedash submissions pending |
 | M7+ — x402 / ghosts | stretch | Post-M6 only |
 
-**Current branch:** `main` (all merged). Next: build the full tower (M3).
+**Current branch:** `claude/vertical-mobile-gameplay-AwCVz`. Next: build the full vertical tower (M3).
 
 ---
 
 **Locked decisions** (confirmed with user):
 - Genre: one-run Jump King-style climber
+- **Orientation: portrait-first — 480×854 (9:16).** Mobile plays in portrait, no "rotate device" prompt. Desktop gets a centered portrait window.
 - Stack: TypeScript + Vite + **Phaser 4**
 - Physics: Matter.js distance constraint (Worms-style rigid rope)
+- **Rope mechanic: Worms-faithful pendulum — gravity drives swings, L/R only pumps, no free air steering**
+- **Rope tests are mandatory** — `tests/rope.test.ts` must pass before any merge
 - Deployment: itch.io + GitHub Pages + Wavedash
 - Ethereum: x402 is nice-to-have only
 
@@ -155,7 +159,7 @@ The mobile layout has TWO modes, selectable from the title screen and remembered
 - On-screen buttons fade to 15% opacity when not being held, to keep the ink-&-ember aesthetic clean.
 - One-finger rule: the arena tap/drag and the button zones never conflict. Two-finger chording (walk + swing simultaneously) works because buttons and arena taps are independent pointer IDs.
 - Haptic feedback (`navigator.vibrate(8)`) on rope stick + on detach. 8ms is subtle. Guarded for browsers without the API.
-- Portrait users see a "rotate device" overlay — game is landscape 16:9 only.
+- **Portrait is the primary orientation (480×854, 9:16).** No "rotate device" overlay. Desktop shows a centered portrait window. Landscape is not supported.
 
 **Why this satisfies "easy to learn, hard to master":**
 - **Learn curve:** first swing happens within 5 seconds of touching the screen regardless of mode. Tap mode needs literally one input.
@@ -180,21 +184,52 @@ Core APIs:
 4. Each frame in `SWINGING`: up/down keys mutate `constraint.length` at `REEL_SPD`, clamped to `[MIN_LEN, MAX_LEN]`. Jump key calls `detachWithImpulse()`.
 5. `drawLine()`: simple `Graphics.lineBetween(player, anchor)` tinted by active cosmetic.
 
-**Tuning knobs** (put in `src/config.ts`):
+**Tuning knobs** (live in `src/config.ts` — `PHYSICS` const):
 ```
 player.mass        = 1.0
-player.frictionAir = 0.005   // higher kills swings, lower = slidey
-stiffness          = 0.9     // Worms rigid rope
-damping            = 0.05
-REEL_SPD           = 250     // px/s
-MAX_ROPE           = 400     // px
+player.frictionAir = 0.003   // LOW — swing momentum must persist; raise only if swings feel infinite
+stiffness          = 1.0     // Worms rigid rod (not bungee). Lower = floaty/springy, do not go below 0.9
+damping            = 0.01    // minimal; higher kills pendulum
+REEL_SPD           = 200     // px/s
+MAX_ROPE           = 380     // px (portrait world is narrower)
 MIN_LEN            = 24
 gravity.y          = 1.0
-positionIterations = 8
-velocityIterations = 6
+positionIterations = 10      // more iterations = stiffer constraint feel
+velocityIterations = 8
+constraintIterations = 6
+swingPump          = 0.003   // INTENTIONALLY TINY — gravity drives the swing, not arrow keys
+                             // Do NOT raise this. "Can just press arrow and have all strength" = wrong feel.
 ```
 
+**Critical rope feel invariant:** L/R keys during swing are a subtle pendulum pump, not free steering.
+The player should need 2–3 full swings to build significant upward momentum, not 1 frame of arrow-holding.
+If playtesting shows "I can just hold right and go anywhere" — reduce `swingPump` further or apply the
+force only when the horizontal component of swing velocity matches the direction pressed (pump gating).
+
 **Static anchor gotcha:** `matter.add.constraint` needs a `bodyB` — for tile anchors, pass the tile's Matter body (from `convertTilemapLayer`) with `pointB` as the local-space hit point. Never pass only a world point without a `bodyB` or it anchors to `(0,0)`.
+
+### Rope Tests (mandatory)
+
+The rope mechanic is the game's heart. It must be protected by automated tests that run on every push.
+
+**Architecture:** `src/entities/RopeStateMachine.ts` contains the pure state machine (no Phaser deps).
+`src/entities/Rope.ts` is the Phaser adapter (raycasting, constraint, graphics). Only `RopeStateMachine`
+needs tests — the adapter is thin enough to verify by play.
+
+**Test file:** `tests/rope.test.ts` using **vitest**.
+
+**Run:** `npm test` (watches) or `npm run test:run` (CI, single pass).
+
+**Invariants that must always pass:**
+1. State machine: IDLE → FIRING → SWINGING → IDLE (and SWINGING → IDLE on detach)
+2. Refire while swinging: no double constraint, old state cleaned before new FIRING
+3. Miss (no raycast hit): state stays IDLE, no constraint created
+4. Reel in: length decreases, never below `minLength`
+5. Reel out: length increases, never above `maxLength`
+6. No-reel when not SWINGING: length unchanged
+7. Detach impulse direction: force vector points away from anchor (positive dot product with rope direction)
+8. Detach impulse upward bias: `fy < 0` component always present so detach at arc apex flings up
+9. Detach without impulse: no force applied
 
 ---
 
@@ -369,7 +404,7 @@ First-time setup (documented in README): **Settings → Pages → Source: Deploy
 
 ### Secondary targets (manual, for jam submission)
 
-- **itch.io:** `cd dist && zip -r ../harness.zip .` → upload as HTML5 (viewport 960×540). Requires `base: './'` — generated by a separate `npm run build:itch` script that sets `VITE_BASE=./`.
+- **itch.io:** `cd dist && zip -r ../harness.zip .` → upload as HTML5 (viewport 480×854 portrait). Requires `base: './'` — generated by a separate `npm run build:itch` script that sets `VITE_BASE=./`.
 - **Wavedash:** `npm run build:itch && wavedash build push` from repo root. Custom HTML5 entrypoint = `index.html`. `WavedashJS` loads when present, otherwise no-op. Run once at M5 to validate the pipeline, then again at M6 for submission.
 - **Worker (stretch only):** `wrangler deploy` from `server/`. Secrets set via `wrangler secret put`, never committed.
 

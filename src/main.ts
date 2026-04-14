@@ -4,9 +4,9 @@ import { THEME } from './theme';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
 
-// Ink & Ember is smooth / brush-stroke, not pixel-art — so pixelArt is off
-// and roundPixels is false. Leaving pixelArt on would fuzzy-up the circle
-// strokes on the rope glow.
+// Portrait-first (480×854, 9:16). Scales to fill any screen while keeping
+// aspect ratio. Desktop: centered tall window. Mobile: fills portrait screen.
+// roundPixels off — brush-stroke curves need sub-pixel smoothness.
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'game-container',

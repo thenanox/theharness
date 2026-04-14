@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { GAME_H, PHYSICS } from '../config';
+import { GAME_W, GAME_H, TOWER_H, PHYSICS } from '../config';
 import { THEME } from '../theme';
 import { InputController } from '../systems/InputController';
 import { TouchControls } from '../systems/TouchControls';
@@ -9,14 +9,18 @@ import { Player } from '../entities/Player';
 import { Rope } from '../entities/Rope';
 
 /**
- * M1 GameScene — an Ink & Ember arena wide enough to experiment with
- * rope swings. The world is ~2000 px wide so camera follow has room
- * to breathe ahead of M2's vertical climb.
+ * GameScene — vertical tower arena.
  *
- * Ship gate for M1: the player can swing across a 1000 px gap and feel
- * like a Worms player. Visual pass (brush-stroke tiles, ember rope glow,
- * paper backdrop, parallax silhouettes, ink splash on stick) is already
- * wired so every push looks like a game, not a debug stage.
+ * World: GAME_W × TOWER_H (480 × 5000). The viewport (480 × 854) scrolls
+ * vertically as the player climbs. Camera has an upward look-ahead bias so
+ * you can see the next anchor before you reach it.
+ *
+ * Platform layout (bottom → top):
+ *   Zone 1  y 4200–4968  Start / tutorial   basic rope hooks
+ *   Zone 2  y 3200–4200  Boiler Hall        wider gaps, momentum swings
+ *   Zone 3  y 2200–3200  Gauge Shafts       tight passages, reel control
+ *   Zone 4  y 1200–2200  Ignition Chamber   hardest — long swings, narrow ledges
+ *   Zone 5  y    0–1200  Core               final push, ignition socket at top
  */
 export class GameScene extends Phaser.Scene {
   private input2!: InputController;
@@ -25,51 +29,51 @@ export class GameScene extends Phaser.Scene {
   private fx!: VisualFX;
   private aimGuide!: Phaser.GameObjects.Graphics;
   private hudText!: Phaser.GameObjects.Text;
+  private heightText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('Game');
   }
 
   create(): void {
-    const ARENA_W = 2000;
-    const ARENA_H = GAME_H;
+    const W = GAME_W;
+    const H = TOWER_H;
 
-    this.cameras.main.setBounds(0, 0, ARENA_W, ARENA_H);
+    // World bounds — narrow (portrait width) and very tall.
+    this.cameras.main.setBounds(0, 0, W, H);
     this.cameras.main.setBackgroundColor(THEME.palette.background);
 
     this.matter.world.setGravity(0, PHYSICS.gravityY);
-    this.matter.world.setBounds(0, -400, ARENA_W, ARENA_H + 400);
+    // Give some breathing room above and below the tower.
+    this.matter.world.setBounds(0, -200, W, H + 200);
 
-    // Visual FX first — paper backdrop, machine parallax, then geometry.
-    // Parallax is the "Machines → Derelict Engine" variant: dead cogs +
-    // cold smokestacks behind the arena instead of abstract ink columns.
+    // VisualFX layer.
     this.fx = new VisualFX(this);
-    this.fx.paintPaperBackdrop(ARENA_W, ARENA_H);
-    this.fx.paintMachineParallax(ARENA_W, ARENA_H);
+    this.fx.paintPaperBackdrop(W, H);
+    this.fx.paintMachineParallax(W, H);
 
-    this.buildArena(ARENA_W, ARENA_H);
-    this.paintArenaDecor(ARENA_W, ARENA_H);
+    this.buildTower(W, H);
+    this.paintTowerDecor(W, H);
 
-    // Player + rope (with VisualFX wired for ember glow + ink splashes).
-    this.player = new Player(this, 120, ARENA_H - 120);
+    // Player spawns near the bottom.
+    const spawnY = H - 100;
+    this.player = new Player(this, W / 2, spawnY);
     this.rope = new Rope(this, this.player, this.fx);
 
-    // Aim guide graphics — a thin dashed hint of where the rope will go.
     this.aimGuide = this.add.graphics().setDepth(4);
 
-    // Input + on-screen touch controls (mobile).
     this.input2 = new InputController(this);
     new TouchControls(this, this.input2);
 
-    // Camera follow (real camera work lands in M2; for M1 just a soft follow).
-    this.cameras.main.startFollow(this.player.gfx, true, 0.15, 0.15);
+    // Camera: follow with vertical bias — look upward so the player can see
+    // anchors above them before committing to a swing.
+    this.cameras.main.startFollow(this.player.gfx, true, 0.08, 0.08);
+    this.cameras.main.setFollowOffset(0, GAME_H * 0.15); // look-ahead: player sits in lower 40%
 
-    // Fog veil pinned to the viewport so depths fade to bone-white paper.
-    this.fx.paintBottomFog(this.scale.width, this.scale.height);
+    // Fog veil pinned to viewport bottom.
+    this.fx.paintBottomFog(GAME_W, GAME_H);
 
-    // Ground detection — naive collision listener: if the player contacts
-    // anything while moving slowly downward, mark grounded. Hard landings
-    // kick off a grey dust puff.
+    // Ground detection.
     this.matter.world.on(
       'collisionactive',
       (event: { pairs: Array<{ bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType }> }) => {
@@ -88,33 +92,40 @@ export class GameScene extends Phaser.Scene {
       },
     );
 
-    // HUD
+    // HUD — pinned to viewport, scrollFactor 0.
     this.hudText = this.add
-      .text(8, 54, '', {
+      .text(8, 8, '', {
         fontFamily: 'monospace',
-        fontSize: '13px',
+        fontSize: '11px',
         color: '#1b1c21',
       })
       .setScrollFactor(0)
-      .setDepth(100);
+      .setDepth(200)
+      .setAlpha(0.7);
 
-    this.add
-      .text(
-        this.scale.width / 2,
-        14,
-        'M2.5 · DERELICT ENGINE — click/tap to cast cable · W/S or ▲▼ reel · space to detach · A/D walk',
-        {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#1b1c21',
-        },
-      )
+    this.heightText = this.add
+      .text(W / 2, 14, '', {
+        fontFamily: 'monospace',
+        fontSize: '15px',
+        color: '#ff7a3d',
+      })
       .setOrigin(0.5, 0)
-      .setAlpha(0.75)
       .setScrollFactor(0)
-      .setDepth(100);
+      .setDepth(200);
 
-    // Start music on first user input (autoplay lockouts).
+    // Instruction hint — fades after 10s.
+    this.add
+      .text(W / 2, GAME_H - 28, 'tap / click to fire cable · W/▲ reel · space to detach', {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#1b1c21',
+      })
+      .setOrigin(0.5, 1)
+      .setAlpha(0.55)
+      .setScrollFactor(0)
+      .setDepth(200);
+
+    // Start music on first touch.
     this.input.once('pointerdown', () => {
       AudioBus.startIfLoaded(this);
       AudioBus.duck(this, 0.6);
@@ -122,92 +133,125 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Arena: floor, ceiling, side walls, some ceiling platforms for ropes.
-   * Each physical rectangle is paired with a brushstroke slab drawn on
-   * top via VisualFX so collision shapes match what the player sees.
+   * Build the vertical tower's collision geometry.
+   *
+   * Structure: two side walls spanning the full height, floor at the very
+   * bottom, ceiling (ignition socket) at the very top, plus a series of
+   * platforms and ledges to climb through.
+   *
+   * Platforms are intentionally sparse — you MUST use the rope to advance.
    */
-  private buildArena(w: number, h: number): void {
-    const add = (x: number, y: number, w2: number, h2: number, color: number, seed: number) => {
-      // Invisible static Matter rect — the physical truth.
-      const r = this.add.rectangle(x, y, w2, h2, color, 0);
+  private buildTower(W: number, H: number): void {
+    const slab = (x: number, y: number, w: number, h: number, color: number, seed: number) => {
+      const r = this.add.rectangle(x, y, w, h, color, 0);
       this.matter.add.gameObject(r, { isStatic: true, friction: 0.4, label: 'wall' });
-      // Visible brushstroke slab painted on top.
-      this.fx.paintBrushSlab(x, y, w2, h2, color, seed);
-      return r;
+      this.fx.paintBrushSlab(x, y, w, h, color, seed);
     };
 
-    // Floor
-    add(w / 2, h - 16, w, 32, THEME.palette.stone, 101);
-    // Ceiling (rope-able surface spanning the arena)
-    add(w / 2, 16, w, 32, THEME.palette.stone, 203);
-    // Side walls
-    add(16, h / 2, 32, h, THEME.palette.stone, 307);
-    add(w - 16, h / 2, 32, h, THEME.palette.stone, 409);
+    const wallThick = 24;
+    const half = wallThick / 2;
 
-    // Ceiling platforms you can rope from — the ship gate is reaching
-    // the rightmost one via a swing.
-    add(450, 180, 160, 24, THEME.palette.moss, 503);
-    add(900, 140, 180, 24, THEME.palette.moss, 601);
-    add(1350, 200, 160, 24, THEME.palette.moss, 709);
-    add(1750, 160, 180, 24, THEME.palette.ice, 811);
+    // Side walls — full height.
+    slab(half,     H / 2, wallThick, H, THEME.palette.stone, 101);
+    slab(W - half, H / 2, wallThick, H, THEME.palette.stone, 109);
 
-    // A mid-air anchor pillar near the middle for tricky swings
-    add(1100, 320, 32, 280, THEME.palette.stone, 907);
+    // Floor.
+    slab(W / 2, H - half, W, wallThick, THEME.palette.stone, 201);
 
-    // Ignition trigger on the far right — the "finish line" narratively
-    // becomes the dead core socket where the player plugs in the ember
-    // cable to reignite the machine. Same rectangle + warm glow; an
-    // IGNITION gauge sits above it so the goal reads as machinery.
-    const flag = this.add.rectangle(w - 80, h - 56, 16, 48, THEME.palette.accent);
-    flag.setStrokeStyle(2, THEME.palette.inkDeep);
-    void flag;
-    // Soft ember glow behind the socket so the eye lands on it.
-    const glow = this.add.circle(w - 80, h - 56, 26, THEME.palette.ropeGlow, 0.25).setDepth(-5);
+    // Ignition socket at the top — reach here to win.
+    slab(W / 2, half, W, wallThick, THEME.palette.stone, 203);
+    const glow = this.add.circle(W / 2, 32, 30, THEME.palette.ropeGlow, 0.3).setDepth(-5);
     this.tweens.add({
       targets: glow,
-      alpha: { from: 0.15, to: 0.35 },
-      duration: 1200,
+      alpha: { from: 0.15, to: 0.4 },
+      duration: 1300,
       yoyo: true,
       repeat: -1,
     });
-    // IGNITION label above the socket, ember tone.
     this.add
-      .text(w - 80, h - 108, THEME.framing.finishLabel, {
+      .text(W / 2, 52, THEME.framing.finishLabel, {
         fontFamily: 'monospace',
-        fontSize: '11px',
+        fontSize: '12px',
         color: '#ff7a3d',
       })
-      .setOrigin(0.5)
+      .setOrigin(0.5, 0)
       .setAlpha(0.9);
+
+    // ── Zone 1: Start area (y 4200–4968) ─────────────────────────────────
+    // A small starting ledge and low ceiling hooks to ease players in.
+    slab(W * 0.5,  4820, W * 0.55, 20, THEME.palette.moss,  301); // wide starting ledge
+    slab(W * 0.2,  4660, W * 0.30, 18, THEME.palette.stone, 305); // left wall protrusion
+    slab(W * 0.8,  4600, W * 0.25, 18, THEME.palette.stone, 307); // right wall protrusion
+    slab(W * 0.5,  4450, W * 0.40, 18, THEME.palette.moss,  311); // mid platform — first rope target
+
+    // ── Zone 2: Boiler Hall (y 3200–4200) ────────────────────────────────
+    slab(W * 0.15, 4100, W * 0.22, 18, THEME.palette.stone, 401);
+    slab(W * 0.85, 4000, W * 0.22, 18, THEME.palette.stone, 403);
+    slab(W * 0.5,  3870, W * 0.35, 18, THEME.palette.moss,  407);
+    slab(W * 0.2,  3720, W * 0.28, 18, THEME.palette.stone, 411);
+    slab(W * 0.8,  3600, W * 0.28, 18, THEME.palette.stone, 413);
+    slab(W * 0.5,  3440, W * 0.35, 18, THEME.palette.ice,   417); // ice — slippery landing
+    slab(W * 0.15, 3300, W * 0.22, 18, THEME.palette.stone, 421);
+
+    // ── Zone 3: Gauge Shafts (y 2200–3200) ───────────────────────────────
+    // Tight passage — center column forces you to rope around it.
+    slab(W * 0.5,  3150, W * 0.18, 200, THEME.palette.stone, 501); // center pillar (ropeable sides)
+    slab(W * 0.15, 3000, W * 0.22, 18,  THEME.palette.moss,  505);
+    slab(W * 0.85, 2870, W * 0.22, 18,  THEME.palette.stone, 507);
+    slab(W * 0.5,  2720, W * 0.30, 18,  THEME.palette.stone, 511);
+    slab(W * 0.15, 2580, W * 0.22, 18,  THEME.palette.ice,   513);
+    slab(W * 0.8,  2450, W * 0.28, 18,  THEME.palette.stone, 517);
+    slab(W * 0.4,  2300, W * 0.35, 18,  THEME.palette.moss,  521);
+
+    // ── Zone 4: Ignition Chamber approach (y 1200–2200) ──────────────────
+    // Long gaps; reel timing becomes critical here.
+    slab(W * 0.85, 2150, W * 0.22, 18,  THEME.palette.stone, 601);
+    slab(W * 0.15, 2000, W * 0.22, 18,  THEME.palette.stone, 603);
+    slab(W * 0.6,  1850, W * 0.25, 18,  THEME.palette.ice,   607);
+    slab(W * 0.5,  1700, W * 0.16, 150, THEME.palette.stone, 611); // narrow pillar
+    slab(W * 0.15, 1580, W * 0.22, 18,  THEME.palette.moss,  615);
+    slab(W * 0.85, 1450, W * 0.22, 18,  THEME.palette.stone, 619);
+    slab(W * 0.4,  1300, W * 0.28, 18,  THEME.palette.stone, 623);
+
+    // ── Zone 5: Core (y 0–1200) ───────────────────────────────────────────
+    slab(W * 0.8,  1150, W * 0.30, 18,  THEME.palette.stone, 701);
+    slab(W * 0.2,  1000, W * 0.30, 18,  THEME.palette.stone, 703);
+    slab(W * 0.55, 860,  W * 0.22, 18,  THEME.palette.moss,  707);
+    slab(W * 0.5,  700,  W * 0.18, 140, THEME.palette.stone, 711); // final pillar
+    slab(W * 0.15, 580,  W * 0.22, 18,  THEME.palette.stone, 715);
+    slab(W * 0.85, 440,  W * 0.22, 18,  THEME.palette.ice,   719);
+    slab(W * 0.5,  300,  W * 0.35, 18,  THEME.palette.moss,  723); // last platform before top
   }
 
   /**
-   * Scatter dead-machine decoration over the arena: rivets on the iron
-   * slabs, a couple of pipe runs between platforms, frozen gauge dials
-   * on the walls, and a steam vent near the ignition socket. All purely
-   * visual — no Matter bodies, no collision, no input cost.
+   * Scatter machine decorations: rivets, pipes, gauge dials, steam vents.
+   * All purely visual — no physics bodies.
    */
-  private paintArenaDecor(w: number, h: number): void {
-    // Rivet rows along the top edge of the floor and along the ceiling.
-    this.fx.paintRivetRow(w / 2, h - 30, w - 120, 1103);
-    this.fx.paintRivetRow(w / 2, 30, w - 120, 1207);
+  private paintTowerDecor(W: number, H: number): void {
+    // Rivet rows along both side walls every ~300px of height.
+    for (let y = 200; y < H; y += 320) {
+      this.fx.paintRivetRow(W * 0.5, y, W - 48, 2000 + y);
+    }
 
-    // Pipe runs connecting the ceiling platforms — feels like the machine
-    // once carried steam from boiler to ignition chamber.
-    this.fx.paintPipeRun(530, 168, 810, 128, 1301);
-    this.fx.paintPipeRun(990, 128, 1270, 188, 1303);
-    this.fx.paintPipeRun(1430, 188, 1660, 148, 1307);
+    // Pipe runs between facing platforms.
+    this.fx.paintPipeRun(W * 0.2, 4660, W * 0.8, 4600, 3001);
+    this.fx.paintPipeRun(W * 0.2, 3720, W * 0.8, 3600, 3003);
+    this.fx.paintPipeRun(W * 0.2, 3000, W * 0.8, 2870, 3005);
+    this.fx.paintPipeRun(W * 0.8, 2150, W * 0.2, 2000, 3007);
+    this.fx.paintPipeRun(W * 0.8, 1450, W * 0.2, 1580, 3009);
 
-    // Frozen gauge dials on the side walls — small, subtle.
-    this.fx.paintGaugeDial(56, 120, 14, 1409);
-    this.fx.paintGaugeDial(56, 260, 12, 1411);
-    this.fx.paintGaugeDial(56, 400, 16, 1413);
-    this.fx.paintGaugeDial(w - 56, 240, 14, 1415);
-    this.fx.paintGaugeDial(w - 56, 420, 12, 1417);
+    // Gauge dials scattered on both walls.
+    const dialPositions = [400, 800, 1100, 1600, 1900, 2400, 2700, 3100, 3500, 3900, 4300, 4700];
+    dialPositions.forEach((y, i) => {
+      const onLeft = i % 2 === 0;
+      this.fx.paintGaugeDial(onLeft ? 44 : W - 44, y, 13 + (i % 3) * 2, 4000 + i);
+    });
 
-    // Dead steam vent near the ignition socket.
-    this.fx.paintSteamVent(w - 120, h - 60, 1503);
-    this.fx.paintSteamVent(w - 48, h - 80, 1507);
+    // Gear silhouettes on mid-parallax layer (via machine parallax already handled).
+
+    // Steam vents near ignition socket.
+    this.fx.paintSteamVent(W * 0.25, 60, 5001);
+    this.fx.paintSteamVent(W * 0.75, 60, 5003);
   }
 
   update(_t: number, deltaMs: number): void {
@@ -215,8 +259,7 @@ export class GameScene extends Phaser.Scene {
 
     this.input2.sample();
 
-    // Context-sensitive fire: tap/click while swinging detaches, otherwise
-    // fires a new rope. One input for both keeps mobile tap mode simple.
+    // Context-sensitive fire: tap while swinging = detach, else fire.
     if (this.input2.state.firePressed) {
       if (this.rope.state === 'SWINGING') {
         this.rope.detach(true);
@@ -224,7 +267,6 @@ export class GameScene extends Phaser.Scene {
         this.rope.fireAt(this.input2.state.aimX, this.input2.state.aimY);
       }
     }
-    // Explicit detach (right-click / ▼) still works as a hard release.
     if (this.input2.state.detachPressed && this.rope.state === 'SWINGING') {
       this.rope.detach(true);
     }
@@ -232,9 +274,7 @@ export class GameScene extends Phaser.Scene {
     this.player.update(this.input2.state, this.rope.state === 'SWINGING');
     this.rope.update(dt, this.input2.state);
 
-    // Aim guide — visible when:
-    //   - desktop + rope IDLE: ghosted dashed line following cursor
-    //   - mobile + Aim-mode pre-aim drag: bright ember dashed line
+    // Aim guide.
     const showGuide =
       (this.rope.state === 'IDLE' && !this.input2.isTouchDevice()) ||
       this.input2.state.aiming;
@@ -252,8 +292,12 @@ export class GameScene extends Phaser.Scene {
       this.aimGuide.clear();
     }
 
+    // Height HUD — distance remaining to the top.
+    const metersLeft = Math.max(0, Math.round((this.player.y - 32) / 10));
+    this.heightText.setText(metersLeft > 0 ? `${metersLeft} m` : 'CLIMB!');
+
     this.hudText.setText(
-      `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}  mode ${this.input2.touchMode}`,
+      `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}  ${this.input2.touchMode}`,
     );
 
     this.input2.clearOneShots();
