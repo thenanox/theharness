@@ -24,8 +24,6 @@ hard to master.
 ## Play
 
 - **Production (main)**: https://thenanox.github.io/theharness/
-- **Current jam branch**: https://thenanox.github.io/theharness/branch/claude-phaser-gamedevjs-jam-uuknr/
-- **PR #2 preview**: https://thenanox.github.io/theharness/pr/2/
 - itch.io: _coming soon_
 - Wavedash: _coming soon_
 
