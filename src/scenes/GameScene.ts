@@ -85,12 +85,16 @@ export class GameScene extends Phaser.Scene {
     this.fx.paintBottomFog(GAME_W, GAME_H);
 
     // ── Collision: grounded detection (collisionactive) ───────────────────
+    // Side walls (label: 'sidewall') do NOT count as grounded — only platforms.
     this.matter.world.on(
       'collisionactive',
       (event: { pairs: Array<{ bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType }> }) => {
         for (const pair of event.pairs) {
-          const inv = pair.bodyA === this.player.body || pair.bodyB === this.player.body;
-          if (!inv) continue;
+          const isBodyA = pair.bodyA === this.player.body;
+          const isBodyB = pair.bodyB === this.player.body;
+          if (!isBodyA && !isBodyB) continue;
+          const other = isBodyA ? pair.bodyB : pair.bodyA;
+          if (other.label === 'sidewall') continue; // wall contact ≠ grounded
           if (this.player.body.velocity.y >= -0.1) {
             const vyBefore = this.player.body.velocity.y;
             this.player.markGrounded(this.time.now);
@@ -100,17 +104,39 @@ export class GameScene extends Phaser.Scene {
       },
     );
 
-    // ── Collision: slide punishment (collisionstart) ──────────────────────
-    // First contact with any surface while not swinging → trigger slide if fast.
+    // ── Collision: slide + wall rebound (collisionstart) ─────────────────
+    // First contact with any surface while not swinging → slide if fast.
+    // Wall hits also get an extra outward impulse so the player can't get stuck.
     this.matter.world.on(
       'collisionstart',
-      (event: { pairs: Array<{ bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType }> }) => {
+      (event: {
+        pairs: Array<{
+          bodyA: MatterJS.BodyType;
+          bodyB: MatterJS.BodyType;
+          collision: { normal: { x: number; y: number } };
+        }>;
+      }) => {
         for (const pair of event.pairs) {
-          const inv = pair.bodyA === this.player.body || pair.bodyB === this.player.body;
-          if (!inv) continue;
-          if (this.rope.state === 'SWINGING') continue; // on rope = fine
+          const isBodyA = pair.bodyA === this.player.body;
+          const isBodyB = pair.bodyB === this.player.body;
+          if (!isBodyA && !isBodyB) continue;
+          if (this.rope.state === 'SWINGING') continue;
+
           const v = this.player.body.velocity;
-          this.player.triggerSlide(Math.hypot(v.x, v.y));
+          const speed = Math.hypot(v.x, v.y);
+          this.player.triggerSlide(speed);
+
+          // For wall hits: apply an extra outward impulse so the player
+          // can't get wedged against the wall. The normal points bodyA→bodyB;
+          // flip sign based on which body is the player to get "away from wall".
+          const other = isBodyA ? pair.bodyB : pair.bodyA;
+          if (other.label === 'sidewall' && speed >= PHYSICS.player.slideThreshold) {
+            // normal points bodyA → bodyB; outward for player is the opposite
+            const n = pair.collision?.normal ?? { x: 0, y: 0 };
+            const outX = isBodyA ? -n.x : n.x;
+            // Push the player away from the wall proportional to impact speed.
+            this.player.kickFromWall(outX, speed);
+          }
         }
       },
     );
@@ -153,15 +179,30 @@ export class GameScene extends Phaser.Scene {
     const T = 24;
     const half = T / 2;
 
+    // Walkable horizontal surface: normal friction for landing.
     const slab = (x: number, y: number, w: number, h: number, color: number, seed: number) => {
       const r = this.add.rectangle(x, y, w, h, color, 0);
-      this.matter.add.gameObject(r, { isStatic: true, friction: 0.4, label: 'wall' });
+      this.matter.add.gameObject(r, { isStatic: true, friction: 0.4, restitution: 0, label: 'platform' });
+      this.fx.paintBrushSlab(x, y, w, h, color, seed);
+    };
+
+    // Vertical side wall: zero friction so the player slides off (no sticking),
+    // small restitution so Matter naturally bounces the player outward on impact.
+    const sidewall = (x: number, y: number, w: number, h: number, color: number, seed: number) => {
+      const r = this.add.rectangle(x, y, w, h, color, 0);
+      this.matter.add.gameObject(r, {
+        isStatic: true,
+        friction: 0,
+        frictionStatic: 0,
+        restitution: 0.3,   // natural bounce: 30% of impact speed reflected outward
+        label: 'sidewall',
+      });
       this.fx.paintBrushSlab(x, y, w, h, color, seed);
     };
 
     // Side walls — full height, 32px thick.
-    slab(16,     H / 2, 32, H, THEME.palette.stone, 101);
-    slab(W - 16, H / 2, 32, H, THEME.palette.stone, 109);
+    sidewall(16,     H / 2, 32, H, THEME.palette.stone, 101);
+    sidewall(W - 16, H / 2, 32, H, THEME.palette.stone, 109);
 
     // Floor.
     slab(W / 2, H - half, W, T + 8, THEME.palette.stone, 201);

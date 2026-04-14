@@ -96,6 +96,22 @@ export class Player {
     }
   }
 
+  /**
+   * Apply a horizontal kick away from a side wall after an impact.
+   * Ensures the player can't get wedged against the wall even if Matter's own
+   * restitution isn't enough to separate them cleanly.
+   *
+   * @param outwardNx  +1 = kick right, -1 = kick left (away from wall)
+   * @param impactSpeed  speed at moment of collision (used to scale the kick)
+   */
+  kickFromWall(outwardNx: number, impactSpeed: number): void {
+    const v = this.body.velocity;
+    // Set horizontal velocity to outward direction, scaled by impact.
+    // Minimum kick of 2 ensures the player always separates, even at low speed.
+    const kickVx = outwardNx * Math.max(2, impactSpeed * 0.35);
+    this.setVelocity(kickVx, v.y);
+  }
+
   update(input: InputState, isSwinging: boolean): void {
     const now = this.scene.time.now;
     const grounded = this.isGrounded(now);

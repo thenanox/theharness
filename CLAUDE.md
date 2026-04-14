@@ -147,8 +147,19 @@ triggers a slide:
 - **The rope can still be fired** — that's the intended escape
 - Visual: player body flashes red-to-charcoal on impact
 
+**Wall hits specifically** (`label: 'sidewall'`) also apply `kickFromWall()` — an outward
+horizontal impulse — so the player can never get wedged against the side walls. After the
+kick, gravity carries them downward to the bottom.
+
 This forces the player to stay on the rope. Ground contact is punishing; only re-firing the
 rope can save the run. Gentle contacts (speed < slideThreshold = 3.5) do not trigger slide.
+
+## Static body labels (GameScene)
+
+| label | friction | restitution | purpose |
+|---|---|---|---|
+| `platform` | 0.4 | 0.0 | floor, ceiling, walkable ledges |
+| `sidewall` | 0.0 | 0.3 | left/right tower walls — bounces player, no sticking |
 
 ## Tunneling prevention
 
