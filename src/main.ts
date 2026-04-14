@@ -22,13 +22,17 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   physics: {
     default: 'matter',
-    matter: {
+    matter: ({
       gravity: { x: 0, y: PHYSICS.gravityY },
       positionIterations: PHYSICS.positionIterations,
       velocityIterations: PHYSICS.velocityIterations,
       constraintIterations: PHYSICS.constraintIterations,
+      // Tight slop: static bodies reject penetration aggressively.
+      // Default 0.05 is too loose; 0.01 tightens it to help prevent tunneling.
+      // Phaser 4 types don't expose this Matter.js engine option — cast needed.
+      slop: 0.01,
       debug: false,
-    },
+    } as unknown) as Phaser.Types.Physics.Matter.MatterWorldConfig,
   },
   scene: [BootScene, GameScene],
 };

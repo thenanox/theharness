@@ -116,22 +116,46 @@ tests/
 
 ---
 
-## Controls
+## Controls (Worms-style angle aim — no mouse required)
 
 ### Desktop
-- **Mouse aim + left click**: fire rope / detach if swinging
+- **A / D or ◄ / ►**: rotate aim arm (when IDLE) / pendulum pump (when SWINGING) / walk (grounded)
+- **Space**: fire rope (IDLE) / detach (SWINGING)
 - **W / Up**: reel in (jump when grounded)
 - **S / Down**: reel out
-- **A / D / arrows**: walk (ground only) / pump swing (tiny force)
-- **Space**: fire or detach (context-sensitive)
 - **Right-click**: hard detach
+- **Mouse** *(optional)*: moves the aim angle when the cursor moves — never required
 
 ### Mobile (portrait)
-- **Tap arena**: fire rope at tap point / detach if swinging
-- **Hold + drag (≥110ms)**: aim mode — reveal aim line, drag to tune, release to fire
-- **Bottom-left ◄ ►**: walk / swing pump (portrait layout)
-- **Bottom-right ▲**: reel in / jump
-- **Bottom-right ▼**: reel out / detach
+- **◄ ►**: rotate aim angle (IDLE) / swing pump (SWINGING)
+- **▲**: fire rope (IDLE) / reel in (SWINGING) / jump (grounded)
+- **▼**: reel out / detach (SWINGING)
+- **Tap arena**: quick-fire at tap point (overrides angle aim for that shot)
+
+### Key design decisions on controls
+- Mouse is optional: full game is playable keyboard-only and on mobile without mouse
+- A/D rotates aim, SPACE fires — just like Worms bazooka aiming
+- `firePressed` does NOT auto-detach when swinging (that breaks the Worms flow)
+- Only `detachPressed` (SPACE, ▼, right-click) detaches the rope
+
+## Slide punishment (Worms / Jump King mechanic)
+
+Any contact with a surface while **not** on the rope, at speed ≥ `PHYSICS.player.slideThreshold`,
+triggers a slide:
+- Player **loses all walk/jump/pump control** until velocity drops below 0.5 px/frame
+- Physics (friction + gravity) decelerate them naturally — no input processed
+- **The rope can still be fired** — that's the intended escape
+- Visual: player body flashes red-to-charcoal on impact
+
+This forces the player to stay on the rope. Ground contact is punishing; only re-firing the
+rope can save the run. Gentle contacts (speed < slideThreshold = 3.5) do not trigger slide.
+
+## Tunneling prevention
+
+`PHYSICS.player.maxSpeed` (15 px/frame) **must always be less than the thinnest platform**
+(24 px in GameScene). If you add thinner platforms, lower maxSpeed first.
+Matter solver iterations are raised (positionIterations 14, velocityIterations 10) and
+`slop: 0.01` (tight) is set in main.ts to reject penetrations aggressively.
 
 ---
 

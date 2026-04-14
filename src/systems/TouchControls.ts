@@ -73,6 +73,9 @@ export class TouchControls {
       () => {
         input.state.reelUp = true;
         input.state.jumpPressed = true;
+        // Also fires the rope when IDLE (GameScene ignores firePressed when SWINGING,
+        // so this can't accidentally detach — ▼ is the explicit detach button).
+        input.state.firePressed = true;
       },
       () => { input.state.reelUp = false; },
     );

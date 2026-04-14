@@ -6,14 +6,22 @@ import type { InputState } from '../systems/InputController';
 type MatterBody = MatterJS.BodyType;
 
 /**
- * The climber. A single capsule-ish box body with rotation locked.
+ * The climber.
  *
- * Ground movement uses gradual acceleration (not instant velocity snap) so
- * it feels weighty rather than ice-skate-y.
+ * ## Slide punishment (Worms / Jump King mechanic)
+ * Any contact with a surface while NOT on the rope triggers a slide if the
+ * player's speed exceeds PHYSICS.player.slideThreshold. While sliding:
+ *   - Walk and jump input is ignored — the player has no control.
+ *   - Physics (friction + gravity) decelerate them naturally.
+ *   - The rope can still be fired — that's the only escape.
+ *   - Once speed drops below 0.5 px/frame the slide ends automatically.
  *
- * Swing control is a TINY pendulum pump (PHYSICS.rope.swingPump per step).
- * Gravity drives the swing; the player nudges it. This is the Worms feel.
- * Do NOT increase swingPump — it breaks the pendulum skill expression.
+ * This forces the player to stay on the rope. Ground contact without a rope
+ * is an emergency; only re-firing the rope can save the run.
+ *
+ * ## Swing pump
+ * A/D during SWINGING applies PHYSICS.rope.swingPump force — intentionally
+ * tiny. Gravity drives the arc; the player only nudges it.
  */
 export class Player {
   readonly scene: Phaser.Scene;
@@ -26,6 +34,9 @@ export class Player {
 
   private lastGroundedAt = 0;
   private lastVyForLanding = 0;
+
+  // Slide state — true while the player has lost control from a hard impact.
+  private sliding = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
@@ -63,50 +74,72 @@ export class Player {
     return now - this.lastGroundedAt < 80;
   }
 
+  /** True while player has lost control from a hard impact. */
+  isSliding(): boolean {
+    return this.sliding;
+  }
+
+  /**
+   * Call from the collision handler (collisionstart) when the player hits a
+   * surface without a rope. Triggers slide if impact speed is high enough.
+   */
+  triggerSlide(impactSpeed: number): void {
+    if (impactSpeed >= PHYSICS.player.slideThreshold) {
+      this.sliding = true;
+      // Visual feedback: briefly tint the player body reddish.
+      this.scene.tweens.add({
+        targets: this.gfx,
+        fillColor: { from: 0xcc3300, to: THEME.palette.player },
+        duration: 400,
+        ease: 'Cubic.easeOut',
+      });
+    }
+  }
+
   update(input: InputState, isSwinging: boolean): void {
     const now = this.scene.time.now;
     const grounded = this.isGrounded(now);
-
-    if (grounded && !isSwinging) {
-      // Ground movement: gradual acceleration toward target speed.
-      // Feels weighty; avoids the instant-direction-flip that kills immersion.
-      const targetVx = input.left ? -3.0 : input.right ? 3.0 : 0;
-      const blendFactor = targetVx === 0 ? 0.55 : 0.25; // decel faster than accel
-      const newVx = this.body.velocity.x + (targetVx - this.body.velocity.x) * blendFactor;
-      this.setVelocity(newVx, this.body.velocity.y);
-    } else if (isSwinging) {
-      // Swing pump: a tiny horizontal impulse so the player can nudge the
-      // pendulum arc. Gravity does the real work — this just gives agency.
-      // PHYSICS.rope.swingPump is intentionally tiny (0.003). Do not raise.
-      const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-      if (fx !== 0) {
-        this.applyForce(fx * PHYSICS.rope.swingPump, 0);
-      }
-    } else {
-      // Free-fall (detached, not grounded): minimal air drift.
-      // Weak enough that trajectory is mostly determined by detach momentum.
-      const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-      if (fx !== 0) {
-        this.applyForce(fx * 0.0008, 0);
-      }
-    }
-
-    // Jump — only when grounded and not on rope.
-    if (input.jumpPressed && grounded && !isSwinging) {
-      this.setVelocity(this.body.velocity.x, -8.5);
-      this.lastGroundedAt = 0;
-    }
-
-    // Speed cap — prevents Matter tunneling through thin walls.
-    // Cap is higher now (30) to let pendulum reach natural peak speed.
     const v = this.body.velocity;
+
+    // Slide exit: once the body slows below threshold the player regains control.
+    if (this.sliding && Math.hypot(v.x, v.y) < 0.5) {
+      this.sliding = false;
+    }
+
+    if (!this.sliding) {
+      if (grounded && !isSwinging) {
+        // Ground movement: gradual acceleration blend so it feels weighty.
+        const targetVx = input.left ? -2.8 : input.right ? 2.8 : 0;
+        const blend = targetVx === 0 ? 0.55 : 0.22;
+        const newVx = v.x + (targetVx - v.x) * blend;
+        this.setVelocity(newVx, v.y);
+      } else if (isSwinging) {
+        // Pendulum pump — tiny nudge, gravity does the real work.
+        const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+        if (fx !== 0) this.applyForce(fx * PHYSICS.rope.swingPump, 0);
+      } else {
+        // Free-fall: barely any air control. Trajectory comes from detach momentum.
+        const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+        if (fx !== 0) this.applyForce(fx * 0.0008, 0);
+      }
+
+      // Jump — only when grounded and not on rope.
+      if (input.jumpPressed && grounded && !isSwinging) {
+        this.setVelocity(v.x, -8.5);
+        this.lastGroundedAt = 0;
+      }
+    }
+    // While sliding: no walk/jump. Physics carries the player until stop.
+    // (Rope firing is still allowed — handled by GameScene, not here.)
+
+    // Speed cap — prevents Matter tunneling. maxSpeed < platform thickness (24px).
     const speed = Math.hypot(v.x, v.y);
     if (speed > PHYSICS.player.maxSpeed) {
       const s = PHYSICS.player.maxSpeed / speed;
       this.setVelocity(v.x * s, v.y * s);
     }
 
-    // Sync dressing container to physics body position.
+    // Sync dressing container to physics body.
     this.dressing.setPosition(this.x, this.y);
   }
 
