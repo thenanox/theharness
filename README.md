@@ -27,12 +27,6 @@ hard to master.
 - itch.io: _coming soon_
 - Wavedash: _coming soon_
 
-> ⚠️ **Are the links above 404?** GitHub Pages has to be enabled once by
-> hand before any of the preview URLs resolve — the workflow already
-> publishes the built game to the `gh-pages` branch, but GitHub won't
-> serve anything until Pages is switched on. See **First-time setup**
-> below. It takes 20 seconds.
-
 ### Iteration loop — every commit is playable
 
 Every push to **any** branch auto-deploys to a GitHub Pages subfolder via
@@ -49,24 +43,6 @@ Stale previews are pruned by `.github/workflows/cleanup-preview.yml` when
 a branch is deleted or a PR is closed.
 
 Allow ~1-2 minutes after a push for the deployment to go live.
-
-### First-time setup (repo owner, one-time, **REQUIRED**)
-
-Until these two toggles are flipped, every preview URL will return 404
-even though the workflow is publishing files correctly.
-
-1. **Enable Pages**: go to
-   [Settings → Pages](https://github.com/thenanox/theharness/settings/pages)
-   → **Source: Deploy from a branch** → pick branch **`gh-pages`** and
-   folder **`/ (root)`** → **Save**. The `gh-pages` branch is already
-   populated by the first workflow run, so you can do this now.
-2. **Allow workflow writes**: go to
-   [Settings → Actions → General](https://github.com/thenanox/theharness/settings/actions)
-   → **Workflow permissions** → **Read and write permissions** → Save.
-
-Within ~1 minute of saving step 1, `https://thenanox.github.io/theharness/pr/2/`
-and every other preview URL in the table above will start serving the game.
-The workflows use only `GITHUB_TOKEN` — no secrets to configure.
 
 ## Controls
 
