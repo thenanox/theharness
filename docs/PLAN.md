@@ -2,7 +2,7 @@
 
 ## Context
 
-We are building an HTML5 game for **Gamedev.js Jam 2026** (Apr 13–26, judged on Innovation, Theme, Gameplay, Graphics, Audio). The repo `/home/user/theharness` is an empty orphan branch `claude/phaser-gamedevjs-jam-uuknr` — full greenfield.
+We are building an HTML5 game for **Gamedev.js Jam 2026** (Apr 13–26, judged on Innovation, Theme, Gameplay, Graphics, Audio). Jam is live — see **Current State** below for shipped milestones.
 
 The core design hook: a **one-run Jump King-style vertical climber** where the only real locomotion is a **Worms-faithful Ninja Rope**. The rope mechanic in Worms rewards skill expression beautifully and nobody has made a pure rope-climbing "one life" game around it. Fall physics + no respawn + skill ceiling = the same addictive rage-climb loop Jump King / Getting Over It pioneered, but with visually stunning rope flow.
 
@@ -13,6 +13,27 @@ The core design hook: a **one-run Jump King-style vertical climber** where the o
 - **Open Source (GitHub)** — repo public, MIT licensed, GitHub Pages build.
 - **Deploy to Wavedash** — ship the same build to Wavedash via `wavedash.toml` + `wavedash build push`, integrate `WavedashJS` for leaderboards. Targets the $2.5k Wavedash cash prize pool.
 - **Ethereum (stretch / nice-to-have)** — via **x402** (Coinbase HTTP-402 spec on Base). Optional cosmetic unlocks. Demoted from core to stretch: only pursued after M5.
+
+---
+
+## Current State — April 2026
+
+| Milestone | Status | Notes |
+|-----------|--------|-------|
+| M0 — scaffold | **done** | Phaser 4 + Vite + TS, Matter world ticking |
+| M1 — rope | **done** | State machine, raycast attach, reel, detach, refire |
+| M2.5 — Machines theme | **done** | `theme.ts` labels, VisualFX machine props, README tagline |
+| M3.5 — branch/PR previews | **done** | `pages.yml` + cleanup workflow + sticky PR comment |
+| M4 — Ink & Ember visual pass | **done** | Brushstroke tiles, ember glow, parallax, particles, mobile dual-mode controls |
+| M2 — camera + height HUD | partial | Camera follow in, formal height meter pending |
+| M3 — full tower (Tiled map) | **pending** | Flat arena only; hand-authored map not started |
+| M5 — persistence + Wavedash | **pending** | SaveStore, WavedashAdapter not yet built |
+| M6 — multi-target deploy | **pending** | itch.io and Wavedash submissions pending |
+| M7+ — x402 / ghosts | stretch | Post-M6 only |
+
+**Current branch:** `main` (all merged). Next: build the full tower (M3).
+
+---
 
 **Locked decisions** (confirmed with user):
 - Genre: one-run Jump King-style climber
@@ -218,7 +239,7 @@ This framing:
 - Keeps the **title "The Harness"** — it already reads as mechanical. The harness IS a machine (a winch + climbing rig). Bonus: fits the theme without renaming the repo.
 - Fits multiple jam challenges at once: Theme (Machines) + Innovation (nobody else is making a rope-climber inside a dead machine) + Graphics (brushstroke-on-blueprint is rare).
 
-### Concrete file changes (M2.5 — ready to execute)
+### Concrete file changes (M2.5 — complete)
 
 **`src/theme.ts`** — palette keys stay, labels swap:
 ```ts
@@ -339,7 +360,7 @@ We use a single workflow `.github/workflows/pages.yml` that:
 
 Resulting URLs:
 - Production (main): `https://thenanox.github.io/theharness/`
-- Jam dev branch: `https://thenanox.github.io/theharness/branch/claude/phaser-gamedevjs-jam-uuknr/`
+- Any other branch `foo`: `https://thenanox.github.io/theharness/branch/foo/`
 - PR #42: `https://thenanox.github.io/theharness/pr/42/`
 
 No external service, no tokens to manage — `actions-gh-pages` uses the auto-provided `GITHUB_TOKEN` scoped to `contents: write` on the gh-pages branch. Zero secrets live in the repo.
@@ -401,13 +422,13 @@ This repo is public from day one. Treat every commit like it's being read by a s
 
 | # | Slice | Ship gate |
 |---|---|---|
-| **M0** | Scaffold: Phaser 4 + Vite + TS booting a blank Matter scene. `npm run dev` loads. | Phaser 4 splash on screen, Matter world ticking. |
-| **M1** | Rope feels right: flat arena, mouse-aim, raycast-attach, reel, detach, refire. No art. | Swing across a 1000px gap and feel good. If no, pivot stiffness or kill project. |
-| **M2** | One vertical screen, camera follow, walk/jump recovery, HUD height meter. | Reach a ledge 500px up using only rope. |
-| **M2.5** | **Theme adaptation — "Machines → Derelict Engine"**: update `theme.ts` labels + tagline, add `paintRivetRow` / `paintPipeRun` / `paintGaugeDial` / `paintGearSilhouette` / `paintSteamVent` to `VisualFX.ts`, scatter decoration props in `GameScene`, rewrite BootScene title strings, update README tagline. | Title card, HUD, and first arena read as a dead machine. Mechanics and physics untouched. Branch preview loads on desktop + mobile. |
+| **M0** ✓ | Scaffold: Phaser 4 + Vite + TS booting a blank Matter scene. `npm run dev` loads. | Phaser 4 splash on screen, Matter world ticking. |
+| **M1** ✓ | Rope feels right: flat arena, mouse-aim, raycast-attach, reel, detach, refire. No art. | Swing across a 1000px gap and feel good. If no, pivot stiffness or kill project. |
+| **M2** ~ | One vertical screen, camera follow, walk/jump recovery, HUD height meter. | Reach a ledge 500px up using only rope. |
+| **M2.5** ✓ | **Theme adaptation — "Machines → Derelict Engine"**: update `theme.ts` labels + tagline, add `paintRivetRow` / `paintPipeRun` / `paintGaugeDial` / `paintGearSilhouette` / `paintSteamVent` to `VisualFX.ts`, scatter decoration props in `GameScene`, rewrite BootScene title strings, update README tagline. | Title card, HUD, and first arena read as a dead machine. Mechanics and physics untouched. Branch preview loads on desktop + mobile. |
 | **M3** | Full tower: 30-screen Tiled map, 3 biomes, win trigger, End scene. | Playable end-to-end run. |
-| **M3.5** | Branch/PR preview deploys: `peaceiris/actions-gh-pages` publishing to subfolders + PR sticky comment. | Pushing to any branch produces a playable URL within ~2 min. |
-| **M4** | Ink & Ember visual pass: brush-stroke tiles, ember rope glow, parallax silhouettes, ink splashes, win-color-reveal + SFX stubs + music slot. | Looks and sounds like a game. |
+| **M3.5** ✓ | Branch/PR preview deploys: `peaceiris/actions-gh-pages` publishing to subfolders + PR sticky comment. | Pushing to any branch produces a playable URL within ~2 min. |
+| **M4** ✓ | Ink & Ember visual pass: brush-stroke tiles, ember rope glow, parallax silhouettes, ink splashes, win-color-reveal + SFX stubs + music slot. | Looks and sounds like a game. |
 | **M5** | Persistence + Menu + Wavedash integration: SaveStore, best height, `WavedashAdapter` submits score from EndScene. | Best height persists; Wavedash leaderboard entry submitted in a test build. |
 | **M6** | Multi-target deploy: itch.io upload, GitHub Pages workflow green, Wavedash `build push`. | All three play links live from the same `dist`. |
 | **M7 (stretch)** | x402 worker: one cosmetic unlockable on Base Sepolia. | Only if M1–M6 shipped with time to spare. |
