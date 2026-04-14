@@ -106,7 +106,7 @@ jobs:
 
             Allow ~1-2 minutes after the workflow finishes for GitHub Pages
             to pick up the new files. Mobile testers: open the link on your
-            phone (landscape recommended).
+            phone in **portrait orientation**.
 
       - name: Summary
         run: |
