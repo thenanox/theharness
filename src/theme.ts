@@ -28,14 +28,20 @@ export const THEME = {
   },
 
   palette: {
-    // --- world (ink wash, cool greys) ---
-    background: 0xf4efe6,   // bone white paper
-    sky: 0xece6d8,          // faint warm grey
-    fogLow: 0xd8d2c3,       // soft fog fading at bottom
+    // --- world (Dead Oscilloscope: near-black CRT screen) ---
+    background: 0xf4efe6,   // bone white paper (kept for legacy refs)
+    screenBg: 0x080a0c,     // near-black CRT screen background
+    sky: 0xece6d8,          // faint warm grey (unused in oscilloscope style)
+    fogLow: 0x080a0c,       // fog fades to screen bg (dark)
     inkDeep: 0x1b1c21,      // charcoal — deepest ink stroke
     inkMid: 0x3a3b44,       // mid grey stroke
     inkSoft: 0x636572,      // soft grey
     inkGhost: 0x9fa0a9,     // ghosted line (aim guide, parallax back)
+
+    // --- phosphor (zone-based, warms from bottom to top) ---
+    phosphorBase: 0x3aff6a, // cold green — Start zone (machine dead)
+    phosphorWarm: 0xffe060, // amber — Gauge Shafts
+    phosphorHot: 0xfff5c0,  // near-white — Core (about to reignite)
 
     // --- tiles (grayscale + one sage accent) ---
     stone: 0x2a2b32,        // default ink slab

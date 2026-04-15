@@ -98,13 +98,12 @@ export class Rope {
   }
 
   private attach(hit: RayHit): void {
-    // Ink splash on stick.
     this.fx?.inkSplash(hit.point.x, hit.point.y, 8);
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(8);
-    }
+    this.fx?.emberBurst(hit.point.x, hit.point.y);
+    this.player.squashStretch(0.82, 1.28, 120);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(8);
+    this.scene.events.emit('rope-attach');
 
-    // Let the state machine record the anchor and compute initial length.
     this.sm.attach(
       { x: this.player.x, y: this.player.y },
       hit.point,
@@ -141,9 +140,8 @@ export class Rope {
       if (impulse) {
         this.applyForce(impulse.x, impulse.y);
         this.fx?.emberFlicker(this.player.x, this.player.y);
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(6);
-        }
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(6);
+        this.scene.events.emit('rope-detach');
       }
     }
 
@@ -168,7 +166,7 @@ export class Rope {
     const aw = this.sm.anchorWorld();
     if (this.sm.state === 'SWINGING' && aw) {
       if (this.fx) {
-        this.fx.drawEmberRope(this.glowGfx, this.coreGfx, this.player.x, this.player.y, aw.x, aw.y);
+        this.fx.drawEmberRope(this.glowGfx, this.coreGfx, this.player.x, this.player.y, aw.x, aw.y, this.sm.length);
       } else {
         this.coreGfx.lineStyle(2, THEME.palette.rope, 1);
         this.coreGfx.lineBetween(this.player.x, this.player.y, aw.x, aw.y);
@@ -192,14 +190,18 @@ export class Rope {
 
   private flashMiss(sx: number, sy: number, ex: number, ey: number): void {
     const g = this.scene.add.graphics().setDepth(5);
-    g.lineStyle(1, THEME.palette.inkGhost, 0.35);
+    g.lineStyle(1, THEME.palette.phosphorBase, 0.4);
     g.lineBetween(sx, sy, ex, ey);
-    this.scene.tweens.add({
-      targets: g,
-      alpha: 0,
-      duration: 160,
-      onComplete: () => g.destroy(),
-    });
+    // Perpendicular tick marks at the endpoint (missed hook ricochet)
+    const dx = ex - sx, dy = ey - sy;
+    const len = Math.hypot(dx, dy) || 1;
+    const px = -dy / len, py = dx / len; // perpendicular
+    g.lineStyle(1, THEME.palette.phosphorBase, 0.55);
+    for (let i = -1; i <= 1; i++) {
+      const ox = ex + px * i * 5, oy = ey + py * i * 5;
+      g.lineBetween(ox - px * 6, oy - py * 6, ox + px * 6, oy + py * 6);
+    }
+    this.scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() });
   }
 
   /**
