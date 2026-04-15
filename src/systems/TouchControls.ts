@@ -3,21 +3,18 @@ import type { InputController } from './InputController';
 import { THEME } from '../theme';
 
 /**
- * On-screen touch controls for mobile.
+ * On-screen touch controls — portrait layout.
  *
- * Layout:
- *   top-left     : TAP | AIM toggle (small pill)
- *   bottom-left  : ◄ ►      walk / air-nudge
- *   bottom-right : ▲ / ▼    reel in (+jump) / reel out (+detach)
+ * Layout (portrait 480×854):
+ *   Bottom-left  : ◄ ►   walk / swing pump   (two side-by-side circles)
+ *   Bottom-right : ▲ ▼   reel in / reel out  (two stacked circles)
+ *   Top-left     : mode toggle pill           (TAP | AIM)
  *
- * Visual language: ink circles with bone-white glyphs. Buttons sit at
- * ~22% alpha when untouched and brighten to ember when pressed so they
- * stay out of the way on the calm ink world.
+ * Buttons sit at 22% alpha when idle, brighten to ember on press.
+ * Hidden on pure-mouse desktops unless ?touch=1 is in the URL.
  *
- * On touch-capable devices the controls are always visible. On pure-
- * mouse desktops they stay hidden unless ?touch=1 is in the URL.
- * Each button's screen-space rect is registered on the InputController
- * so tap-to-fire ignores taps that land on a button.
+ * Touch zones are registered on InputController so tap-to-fire never
+ * triggers under a button.
  */
 export class TouchControls {
   private scene: Phaser.Scene;
@@ -36,90 +33,79 @@ export class TouchControls {
     }
 
     const { width, height } = scene.scale;
+    // Portrait layout: buttons sized relative to viewport.
+    // Base size: 72px on a 480px-wide canvas (scales with FIT).
     const size = 72;
-    const gap = 12;
-    const margin = 18;
+    const gap = 10;
+    const margin = 16;
 
-    // --- bottom-left: walk pad ---
-    const leftX = margin;
-    const leftY = height - margin - size;
+    // ── Bottom-left: walk pad ◄ ► ────────────────────────────────────────
+    const leftPadX = margin;
+    const btnY = height - margin - size;
+
     this.makeHoldButton(
-      leftX,
-      leftY,
+      leftPadX,
+      btnY,
       size,
       '◄',
-      () => {
-        input.state.left = true;
-      },
-      () => {
-        input.state.left = false;
-      },
+      () => { input.state.left = true; },
+      () => { input.state.left = false; },
     );
     this.makeHoldButton(
-      leftX + size + gap,
-      leftY,
+      leftPadX + size + gap,
+      btnY,
       size,
       '►',
-      () => {
-        input.state.right = true;
-      },
-      () => {
-        input.state.right = false;
-      },
+      () => { input.state.right = true; },
+      () => { input.state.right = false; },
     );
 
-    // --- bottom-right: reel pad, stacked vertically ---
+    // ── Bottom-right: reel pad ▲ / ▼ (stacked) ──────────────────────────
     const rightX = width - margin - size;
-    const topY = height - margin - size * 2 - gap;
-    const botY = height - margin - size;
+    const reelUpY   = height - margin - size * 2 - gap;
+    const reelDownY = height - margin - size;
+
     this.makeHoldButton(
       rightX,
-      topY,
+      reelUpY,
       size,
       '▲',
       () => {
         input.state.reelUp = true;
         input.state.jumpPressed = true;
+        // Also fires the rope when IDLE (GameScene ignores firePressed when SWINGING,
+        // so this can't accidentally detach — ▼ is the explicit detach button).
+        input.state.firePressed = true;
       },
-      () => {
-        input.state.reelUp = false;
-      },
+      () => { input.state.reelUp = false; },
     );
     this.makeHoldButton(
       rightX,
-      botY,
+      reelDownY,
       size,
       '▼',
       () => {
         input.state.reelDown = true;
         input.state.detachPressed = true;
       },
-      () => {
-        input.state.reelDown = false;
-      },
+      () => { input.state.reelDown = false; },
     );
 
-    // --- top-left: TAP/AIM mode toggle ---
+    // ── Top-left: TAP / AIM mode toggle ─────────────────────────────────
     this.makeModeToggle(margin, margin);
 
-    // --- centered hint (fades after first interaction) ---
+    // ── Centered hint (fades after 8 s) ──────────────────────────────────
     const hint = scene.add
-      .text(
-        width / 2,
-        height - 14,
-        'tap to fire · hold anywhere to aim · press ⓘ to swap mode',
-        {
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          color: '#1b1c21',
-        },
-      )
+      .text(width / 2, height - margin - size * 2 - gap * 3, 'tap to fire · ▲▼ to reel', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#1b1c21',
+      })
       .setOrigin(0.5, 1)
-      .setAlpha(0.55)
+      .setAlpha(0.5)
       .setScrollFactor(0)
       .setDepth(1000);
 
-    // Fade the hint after 8 seconds so it's not permanent UI clutter.
     scene.tweens.add({
       targets: hint,
       alpha: 0,
@@ -141,7 +127,7 @@ export class TouchControls {
 
     const bg = this.scene.add
       .circle(x + size / 2, y + size / 2, size / 2, THEME.palette.inkDeep, 0.22)
-      .setStrokeStyle(2, THEME.palette.inkDeep, 0.6)
+      .setStrokeStyle(2, THEME.palette.inkDeep, 0.5)
       .setScrollFactor(0)
       .setDepth(1000)
       .setInteractive({ useHandCursor: true });
@@ -149,7 +135,7 @@ export class TouchControls {
     const text = this.scene.add
       .text(x + size / 2, y + size / 2, label, {
         fontFamily: 'monospace',
-        fontSize: '30px',
+        fontSize: '28px',
         color: '#f4efe6',
       })
       .setOrigin(0.5)
@@ -172,13 +158,13 @@ export class TouchControls {
   }
 
   private makeModeToggle(x: number, y: number): void {
-    const w = 118;
-    const h = 32;
+    const w = 110;
+    const h = 30;
     this.input.registerTouchZone(x, y, w, h);
 
     const bg = this.scene.add
-      .rectangle(x + w / 2, y + h / 2, w, h, THEME.palette.inkDeep, 0.3)
-      .setStrokeStyle(1.5, THEME.palette.inkDeep, 0.7)
+      .rectangle(x + w / 2, y + h / 2, w, h, THEME.palette.inkDeep, 0.28)
+      .setStrokeStyle(1.5, THEME.palette.inkDeep, 0.6)
       .setScrollFactor(0)
       .setDepth(1000)
       .setInteractive({ useHandCursor: true });
@@ -186,7 +172,7 @@ export class TouchControls {
     this.modeLabel = this.scene.add
       .text(x + w / 2, y + h / 2, this.labelText(), {
         fontFamily: 'monospace',
-        fontSize: '13px',
+        fontSize: '12px',
         color: '#f4efe6',
       })
       .setOrigin(0.5)
@@ -196,7 +182,6 @@ export class TouchControls {
     bg.on('pointerdown', () => {
       this.input.toggleTouchMode();
       if (this.modeLabel) this.modeLabel.setText(this.labelText());
-      // Subtle pulse so the player sees the change.
       this.scene.tweens.add({
         targets: [bg, this.modeLabel],
         alpha: { from: 0.4, to: 1 },
@@ -211,6 +196,6 @@ export class TouchControls {
   }
 
   private labelText(): string {
-    return this.input.touchMode === 'tap' ? 'ⓘ  MODE · TAP' : 'ⓘ  MODE · AIM';
+    return this.input.touchMode === 'tap' ? 'ⓘ MODE · TAP' : 'ⓘ MODE · AIM';
   }
 }

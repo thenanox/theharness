@@ -57,7 +57,7 @@ Allow ~1-2 minutes after a push for the deployment to go live.
 
 **MODE · TAP** _(default, easy)_
 - Tap anywhere: fire rope at tap point (or detach if already swinging)
-- Bottom-left `◄ ►`: walk / air nudge
+- Bottom-left `◄ ►`: walk / swing pump
 - Bottom-right `▲`: reel in (jump when grounded)
 - Bottom-right `▼`: reel out (detach when swinging)
 
@@ -69,8 +69,7 @@ Allow ~1-2 minutes after a push for the deployment to go live.
 - `▲` during a swing smoothly reels in — the Worms pendulum-tightening
   move — and is the core high-level mobile skill
 
-Game is landscape 16:9 — rotate phone for best experience. A rotate-hint
-overlay appears on portrait phones.
+Game is **portrait 9:16** — plays natively on mobile in portrait orientation.
 
 ## Stack
 
@@ -100,7 +99,7 @@ The same `dist/` build ships to three places:
   Uses `peaceiris/actions-gh-pages` to publish to subfolders on a shared
   `gh-pages` branch.
 - **itch.io**: `npm run build && cd dist && zip -r ../harness.zip .` →
-  upload as HTML5 (viewport 960×540). Default `VITE_BASE='./'` already
+  upload as HTML5 (viewport 480×854 portrait). Default `VITE_BASE='./'` already
   works inside the itch iframe.
 - **Wavedash**: `npm run build && wavedash build push` (reads
   `wavedash.toml`, uploads `./dist`).

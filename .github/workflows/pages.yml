@@ -8,6 +8,14 @@ name: Deploy preview to GitHub Pages
 #
 # Uses peaceiris/actions-gh-pages instead of actions/deploy-pages so we can
 # publish multiple subfolders to the same site without wiping each other.
+#
+# Race-condition fix: a single push to a branch-with-PR fires BOTH a `push`
+# event AND a `pull_request` (synchronize) event at the same time. Both would
+# try to push to gh-pages concurrently and one would be rejected with
+# "fetch first". Fix: build jobs are concurrency-grouped per event type + ref
+# (so they cancel stale same-type runs), while the deploy job uses a single
+# global serialization group (cancel-in-progress: false) so gh-pages pushes
+# are always queued, never concurrent.
 
 on:
   push:
@@ -21,13 +29,22 @@ permissions:
   contents: write        # to push to gh-pages branch
   pull-requests: write   # to comment on PRs
 
-concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-and-deploy:
+  # ── Build ────────────────────────────────────────────────────────────────
+  # Concurrency is per-event-type + per-branch so that:
+  #   • Two rapid pushes to the same branch cancel the older build.
+  #   • A push event and a pull_request event for the same commit run
+  #     independently (they deploy to different destination paths).
+  build:
     runs-on: ubuntu-latest
+    concurrency:
+      group: build-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+      cancel-in-progress: true
+    outputs:
+      slug:        ${{ steps.slug.outputs.slug }}
+      kind:        ${{ steps.slug.outputs.kind }}
+      vite_base:   ${{ steps.slug.outputs.vite_base }}
+      preview_url: ${{ steps.slug.outputs.preview_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +85,6 @@ jobs:
             echo "kind=${KIND}"
             echo "vite_base=${VITE_BASE}"
             echo "preview_url=${PREVIEW_URL}"
-            echo "repo_name=${REPO_NAME}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
@@ -79,37 +95,64 @@ jobs:
         env:
           VITE_BASE: ${{ steps.slug.outputs.vite_base }}
 
+      # Pass the built dist to the deploy job via artifact.
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.run_id }}
+          path: ./dist
+          retention-days: 1
+
+  # ── Deploy ───────────────────────────────────────────────────────────────
+  # Single global concurrency group with cancel-in-progress: false so that
+  # gh-pages pushes are always serialised — if two builds finish at the same
+  # time the second deploy simply waits for the first to complete instead of
+  # racing and getting rejected with "fetch first".
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    concurrency:
+      group: deploy-gh-pages
+      cancel-in-progress: false
+
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.run_id }}
+          path: ./dist
+
       # Publish to gh-pages at the resolved subfolder. keep_files: true so
       # previews from sibling branches/PRs aren't wiped by this deploy.
       - name: Deploy to gh-pages
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
-          destination_dir: ${{ steps.slug.outputs.slug }}
+          destination_dir: ${{ needs.build.outputs.slug }}
           keep_files: true
-          commit_message: 'deploy: ${{ steps.slug.outputs.kind }} ${{ github.sha }}'
+          commit_message: 'deploy: ${{ needs.build.outputs.kind }} ${{ github.sha }}'
           user_name: 'github-actions[bot]'
           user_email: '41898282+github-actions[bot]@users.noreply.github.com'
 
       # Sticky comment on PRs pointing at the preview URL.
       - name: Comment preview URL on PR
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: preview-url
           message: |
             Preview for this PR will be live at:
 
-            **${{ steps.slug.outputs.preview_url }}**
+            **${{ needs.build.outputs.preview_url }}**
 
             Allow ~1-2 minutes after the workflow finishes for GitHub Pages
             to pick up the new files. Mobile testers: open the link on your
-            phone (landscape recommended).
+            phone in **portrait orientation**.
 
       - name: Summary
         run: |
           echo "### Preview ready" >> "$GITHUB_STEP_SUMMARY"
-          echo "- kind: **${{ steps.slug.outputs.kind }}**" >> "$GITHUB_STEP_SUMMARY"
-          echo "- url: ${{ steps.slug.outputs.preview_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- kind: **${{ needs.build.outputs.kind }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- url: ${{ needs.build.outputs.preview_url }}" >> "$GITHUB_STEP_SUMMARY"
