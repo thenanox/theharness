@@ -86,6 +86,12 @@ export class GameScene extends Phaser.Scene {
         targets: this.cameras.main, zoom: { from: 1.0, to: 1.04 },
         duration: 80, ease: 'Cubic.easeOut', yoyo: true, hold: 40,
       });
+      // Hit-stop: brief physics freeze so the "thunk" registers viscerally.
+      const engine = (this.matter.world as unknown as {
+        engine: { timing: { timeScale: number } };
+      }).engine;
+      engine.timing.timeScale = 0;
+      this.time.delayedCall(40, () => { engine.timing.timeScale = 1; });
     });
     this.events.on('rope-detach', () => { this.triggerShake(55, 0.0035); });
 
@@ -100,7 +106,7 @@ export class GameScene extends Phaser.Scene {
     this.input2 = new InputController(this);
     new TouchControls(this, this.input2);
 
-    this.cameras.main.startFollow(this.player.gfx, true, 0.08, 0.08);
+    this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
     this.cameras.main.setFollowOffset(0, GAME_H * 0.15);
 
     this.fx.paintScanlines(GAME_W, GAME_H);

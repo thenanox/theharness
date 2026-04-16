@@ -37,7 +37,7 @@ export const PHYSICS = {
   rope: {
     stiffness: 1.0,       // truly rigid rod (Worms feel); never go below 0.9
     damping: 0.01,        // minimal — pendulum must persist
-    reelSpeed: 200,       // px/s
+    reelSpeed: 250,       // px/s
     maxLength: 380,       // px
     minLength: 24,        // px
     fireTravelMs: 110,    // hook-animation time ms
