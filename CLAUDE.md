@@ -50,11 +50,13 @@ The rope mechanic is the game. Everything else is decoration.
 
 ### Key physics constants (in `src/config.ts`)
 ```
-frictionAir   = 0.003   // low → swing momentum persists (correct)
-stiffness     = 1.0     // rigid — Worms rod, not bungee
-damping       = 0.01    // minimal → pendulum lasts
-reelSpeed     = 200     // px/s — fast enough to feel responsive
-swingPump     = 0.003   // per-frame nudge force during swing (intentionally tiny)
+frictionAir      = 0.003   // low → swing momentum persists (correct)
+stiffness        = 1.0     // rigid — Worms rod, not bungee
+damping          = 0.01    // minimal → pendulum lasts
+reelSpeed        = 200     // px/s — fast enough to feel responsive
+swingPump        = 0.003   // per-frame nudge force during swing (intentionally tiny)
+detachImpulse    = 0.010   // kick on detach, with upward bias baked into the vector
+aim.rotateSpeed  = 2.6     // rad/s — ~150°/sec sweep when A/D held in IDLE
 ```
 These are hard-won. Don't increase `swingPump` or `frictionAir` without testing.
 
@@ -126,17 +128,31 @@ tests/
 - **Right-click**: hard detach
 - **Mouse** *(optional)*: moves the aim angle when the cursor moves — never required
 
-### Mobile (portrait)
-- **◄ ►**: rotate aim angle (IDLE) / swing pump (SWINGING)
-- **▲**: fire rope (IDLE) / reel in (SWINGING) / jump (grounded)
-- **▼**: reel out / detach (SWINGING)
-- **Tap arena**: quick-fire at tap point (overrides angle aim for that shot)
+### Mobile (portrait) — two tap modes, `ⓘ MODE` pill toggles top-left
+Mode preference persists in `localStorage` under `harness.touchMode`.
+
+**MODE · TAP** *(default, beginner)*
+- **Tap arena**: fire rope at tap point (or detach if already SWINGING)
+- **◄ ►** (bottom-left): walk / swing pump
+- **▲** (bottom-right, top): reel in (and fires rope if IDLE, jumps if grounded)
+- **▼** (bottom-right, bottom): reel out / detach when SWINGING
+
+**MODE · AIM** *(hard-to-master depth)*
+- Hold on arena ≥ `HOLD_AIM_MS` (110 ms) to reveal ember aim line; drag tunes angle
+  and length; release to fire at final drag point
+- Quick taps (< 110 ms) still snap-fire, preserving TAP-mode muscle memory
+- All four hold-buttons behave identically to TAP mode
+- `▲` mid-swing smoothly reels in — the Worms pendulum-tightening move and the
+  core high-level mobile skill
 
 ### Key design decisions on controls
 - Mouse is optional: full game is playable keyboard-only and on mobile without mouse
 - A/D rotates aim, SPACE fires — just like Worms bazooka aiming
-- `firePressed` does NOT auto-detach when swinging (that breaks the Worms flow)
+- `firePressed` does NOT auto-detach when swinging (that breaks the Worms flow).
+  GameScene explicitly only reacts to `firePressed` when rope state is `IDLE`.
 - Only `detachPressed` (SPACE, ▼, right-click) detaches the rope
+- `TouchControls` registers touch zones on `InputController` so tap-to-fire
+  ignores taps that land on an on-screen button
 
 ## Slide punishment (Worms / Jump King mechanic)
 
@@ -161,6 +177,23 @@ rope can save the run. Gentle contacts (speed < slideThreshold = 3.5) do not tri
 | `platform` | 0.4 | 0.0 | floor, ceiling, walkable ledges |
 | `sidewall` | 0.0 | 0.3 | left/right tower walls — bounces player, no sticking |
 
+## Zones (phosphor color + vignette)
+
+`GameScene.ZONES` (top-down order): `Core` → `Ignition Chamber` → `Gauge Shafts`
+→ `Boiler Hall` → `Start`. Each zone has a `maxY` boundary and a `phosphor`
+color. On crossing a boundary, `updateZone()`:
+
+1. Tweens `phosphorColor` from the old to new zone color over 800 ms
+   (Sine.easeInOut), using `VisualFX.lerpColor`.
+2. Pushes the new color through `Player.setPhosphorColor()` — player gfx and
+   glow retint live.
+3. Repaints the vignette with zone-specific intensity (Ignition Chamber gets
+   the heaviest vignette, Start the lightest).
+
+All HUD readouts (height text, progress bar, ambient drift) sample
+`this.phosphorColor` each frame so a zone transition retints everything in one
+sweep.
+
 ## Tunneling prevention
 
 `PHYSICS.player.maxSpeed` (15 px/frame) **must always be less than the thinnest platform**
@@ -170,27 +203,121 @@ Matter solver iterations are raised (positionIterations 14, velocityIterations 1
 
 ---
 
-## Visual direction: Ink & Ember
+## Audio
 
-- 4-step cool grey ink-wash world (bone-white paper → charcoal)
-- Single warm accent: ember orange (`#ff7a3d`) — rope only, player belt, finish glow
-- Machine decorations: rivets, pipe runs, frozen gauge dials, gear silhouettes
-- On win: full palette re-color (machine reignites) — only ever happens once per run
+Single-slot music bus in `AudioBus.ts`. Drop a file at
+`public/assets/audio/music.ogg` (optional `music.mp3`) and the game loops it
+on first user input. **If the file is missing the game runs silent — never
+crashes.** `BootScene.preload()` queues the asset; `GameScene` calls
+`startIfLoaded()` on the first pointerdown and `duck(0.6)` during gameplay.
+No per-sample SFX yet — all feedback is visual (shake, flash, particle).
+
+---
+
+## Visual direction: Ink & Ember (CRT Oscilloscope render)
+
+The art direction is **Ink & Ember** — oiled iron, frosted gauge glass, ember
+cable — but the current render is a **dead-oscilloscope CRT**: near-black
+`screenBg` (`#080a0c`) with a single phosphor trace color that warms from
+bottom to top as the player climbs.
+
+- `screenBg` = near-black CRT backdrop; no sky, no paper white in play
+- Single warm accent: ember orange (`#ff7a3d`) — rope, player belt, finish glow,
+  progress bar label, height readout
+- Phosphor color is **zone-based** and tweens smoothly between zones
+  (see `ZONES` in `GameScene.ts`):
+  - **Start** (bottom) → cold green `0x3aff6a`
+  - **Boiler Hall** → lime `0x9aff60`
+  - **Gauge Shafts** → amber `0xffe060`
+  - **Ignition Chamber** → hot orange `0xffb030`
+  - **Core** (top, ignition target) → hot white `0xfff5c0`
+- Player gfx, ambient drift, halo, trail, progress bar, and vignette all
+  retint with the current phosphor color — one zone transition = one palette
+  sweep
+- Machine decorations: rivets, pipe runs, frozen gauge dials, steam vents
+  (see `VisualFX.paintRivetRow / paintPipeRun / paintGaugeDial / paintSteamVent`)
+- On win: full palette re-color via `playWinColorReveal()` (machine reignites) —
+  only ever happens once per run. Ambient drift flips all-ember after ignition.
 - No external sprite assets. All rendering via Phaser Graphics API + `VisualFX.ts`.
+- `theme.ts` keeps legacy ink-wash tokens (`background`, `sky`, `inkDeep`, etc.)
+  for compatibility. Day-to-day tuning touches `palette.screenBg`, `phosphor*`,
+  `rope`, `ember`.
 
 ---
 
 ## Dev workflow
 
 ```bash
-npm run dev       # local dev server, localhost:5173
-npm test          # vitest (rope tests must pass)
-npm run typecheck # tsc --noEmit (no type errors allowed)
-npm run build     # production build → ./dist
+npm install
+npm run dev        # local dev server, http://localhost:5173
+npm test           # vitest watch (rope tests must pass)
+npm run test:run   # vitest one-shot (use in CI / pre-push checks)
+npm run typecheck  # tsc --noEmit (no type errors allowed)
+npm run build      # tsc --noEmit + vite build → ./dist
+npm run preview    # serve ./dist locally
 ```
 
-Every push to any branch auto-deploys to GitHub Pages preview:
-`https://thenanox.github.io/theharness/branch/<branch-name>/`
+`npm run build` runs `tsc --noEmit` first — build fails on any type error.
+
+### Deploy targets
+
+The same `dist/` build ships to three places; they share build output, only the
+wrapper differs.
+
+| Target | Command / Trigger | URL |
+|---|---|---|
+| GitHub Pages (main) | push to `main` | `https://thenanox.github.io/theharness/` |
+| GitHub Pages (branch) | push to any other branch `foo` | `https://thenanox.github.io/theharness/branch/<foo>/` (slashes become dashes) |
+| GitHub Pages (PR) | open PR #N | `https://thenanox.github.io/theharness/pr/<N>/` (sticky comment posted automatically) |
+| itch.io | `npm run build && cd dist && zip -r ../harness.zip .` → upload as HTML5 (viewport 480×854 portrait) | — |
+| Wavedash | `npm run build && wavedash build push` (reads `wavedash.toml`, uploads `./dist`) | — |
+
+`VITE_BASE` is set by CI per branch/PR. Default is `'./'` so itch.io and
+Wavedash iframes work without tweaking.
+
+Stale previews are cleaned by `.github/workflows/cleanup-preview.yml` on
+branch delete / PR close. Gitleaks scans every push via
+`.github/workflows/gitleaks.yml`.
+
+Allow ~1–2 minutes after a push for the preview deploy to go live.
+
+---
+
+## Milestone state (April 2026)
+
+Kept in sync with `docs/PLAN.md`. Source of truth for scope discussions is
+that file — this is a quick pointer.
+
+| Milestone | Status |
+|---|---|
+| M0 — scaffold (Phaser 4 + Vite + TS + Matter) | done |
+| M1 — rope state machine + raycast + reel + detach/refire | done |
+| M2.5 — Machines theme (framing, labels, decor) | done |
+| M3.5 — branch/PR preview deploys + cleanup | done |
+| M4 — Ink & Ember visual pass (brushstrokes, CRT phosphor, parallax, particles, mobile dual-mode) | done |
+| M4.5 — Portrait pivot (480×854) + RopeStateMachine extracted + vitest suite | done |
+| M2 — camera + height HUD | partial (vertical follow in; formal height meter pending) |
+| M3 — full tower via Tiled map | pending (tall vertical arena stub in; Tiled authoring not started) |
+| M5 — persistence + Wavedash leaderboards | pending |
+| M6 — itch.io + Wavedash submissions | pending |
+| M7+ — x402 cosmetic unlocks, ghost replays | stretch (post-M6 only) |
+
+---
+
+## Working on this repo (Git discipline)
+
+- All work happens on a feature branch. Never push to `main` directly.
+- Commit messages: short imperative mood, reference the system touched
+  (`rope:`, `scene:`, `visualfx:`, `docs:`). No Claude footers in commits the
+  user will read in `git log`.
+- Before committing any rope or physics change, run `npm run test:run` +
+  `npm run typecheck` locally. Both must pass.
+- Preview URL for the branch appears within ~1–2 min of pushing; use it to
+  verify mobile portrait rendering and touch controls on an actual phone when
+  changing input or layout code.
+- Do not commit `.env`, `.pem`, `.key`, `.wrangler/`, or `.wavedash/` files —
+  `.gitignore` already excludes them and `gitleaks` will fail CI if anything
+  slips through. See `SECURITY.md` for the disclosure process.
 
 ---
 
