@@ -134,7 +134,7 @@ The skill ceiling should come from **timing and physics intuition**, not from in
 ### Desktop (already implemented, small additions)
 - **Mouse position = aim**, always visible (thin 2-dot dashed line from player → cursor up to `MAX_ROPE` in IDLE state, ghosted out of combat).
 - **Left click / space:** context-sensitive — fire rope when IDLE, detach when SWINGING.
-- **W / Up:** reel in (also jumps when grounded).
+- **W / Up:** reel in.
 - **S / Down:** reel out.
 - **A / D / Left / Right:** walk on ground, air-nudge while swinging.
 - **Right click:** hard detach (redundant with space, kept for muscle memory).
@@ -146,7 +146,7 @@ The mobile layout has TWO modes, selectable from the title screen and remembered
 **Mode 1 — "Tap" (default, easy to learn):**
 - Tap anywhere on the arena → fire rope at the tap point (or detach if already swinging). Single input for both keeps learning cost near zero.
 - Bottom-left `◄ ►` pad: walk / air-nudge. Large (72px) thumb zone, 30% transparent.
-- Bottom-right stacked `▲` / `▼`: reel in (jump when grounded) / reel out (detach when swinging).
+- Bottom-right stacked `▲` / `▼`: reel in (also fires rope if IDLE) / reel out (detach when swinging).
 - Hint overlay on first load: "tap to fire · hold buttons to reel".
 
 **Mode 2 — "Aim" (unlocks after 3 completed swings, or toggle in settings):**

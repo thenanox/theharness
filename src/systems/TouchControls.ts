@@ -48,16 +48,16 @@ export class TouchControls {
       btnY,
       size,
       '◄',
-      () => { input.state.left = true; },
-      () => { input.state.left = false; },
+      () => { input.setTouchHold('left', true); },
+      () => { input.setTouchHold('left', false); },
     );
     this.makeHoldButton(
       leftPadX + size + gap,
       btnY,
       size,
       '►',
-      () => { input.state.right = true; },
-      () => { input.state.right = false; },
+      () => { input.setTouchHold('right', true); },
+      () => { input.setTouchHold('right', false); },
     );
 
     // ── Bottom-right: reel pad ▲ / ▼ (stacked) ──────────────────────────
@@ -71,13 +71,12 @@ export class TouchControls {
       size,
       '▲',
       () => {
-        input.state.reelUp = true;
-        input.state.jumpPressed = true;
+        input.setTouchHold('reelUp', true);
         // Also fires the rope when IDLE (GameScene ignores firePressed when SWINGING,
         // so this can't accidentally detach — ▼ is the explicit detach button).
         input.state.firePressed = true;
       },
-      () => { input.state.reelUp = false; },
+      () => { input.setTouchHold('reelUp', false); },
     );
     this.makeHoldButton(
       rightX,
@@ -85,10 +84,10 @@ export class TouchControls {
       size,
       '▼',
       () => {
-        input.state.reelDown = true;
+        input.setTouchHold('reelDown', true);
         input.state.detachPressed = true;
       },
-      () => { input.state.reelDown = false; },
+      () => { input.setTouchHold('reelDown', false); },
     );
 
     // ── Top-left: TAP / AIM mode toggle ─────────────────────────────────

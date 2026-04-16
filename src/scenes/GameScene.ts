@@ -228,7 +228,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setAlpha(0.9);
 
     // ── ZONE: START (y ≈ 5000..4200) — warmup, generous ledges ──────────────
-    // Teach: walk, jump, first rope fire. Falls are cheap here.
+    // Teach: walk, aim, first rope fire. Falls are cheap here.
     slab(W * 0.32, 4850, W * 0.38, T, THEME.palette.moss,  301);
     slab(W * 0.78, 4760, W * 0.22, T, THEME.palette.stone, 305);
     slab(W * 0.45, 4660, W * 0.18, T, THEME.palette.stone, 309);

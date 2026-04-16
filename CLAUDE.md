@@ -123,18 +123,21 @@ tests/
 ### Desktop
 - **A / D or ◄ / ►**: rotate aim arm (when IDLE) / pendulum pump (when SWINGING) / walk (grounded)
 - **Space**: fire rope (IDLE) / detach (SWINGING)
-- **W / Up**: reel in (jump when grounded)
+- **W / Up**: reel in
 - **S / Down**: reel out
 - **Right-click**: hard detach
 - **Mouse** *(optional)*: moves the aim angle when the cursor moves — never required
+
+No jump button. The rope is the *only* way up. Grounded contact is a recovery
+perch — fire again to climb.
 
 ### Mobile (portrait) — two tap modes, `ⓘ MODE` pill toggles top-left
 Mode preference persists in `localStorage` under `harness.touchMode`.
 
 **MODE · TAP** *(default, beginner)*
 - **Tap arena**: fire rope at tap point (or detach if already SWINGING)
-- **◄ ►** (bottom-left): walk / swing pump
-- **▲** (bottom-right, top): reel in (and fires rope if IDLE, jumps if grounded)
+- **◄ ►** (bottom-left): rotate aim (IDLE) / pendulum pump (SWINGING) / walk (grounded)
+- **▲** (bottom-right, top): reel in (also fires rope if IDLE)
 - **▼** (bottom-right, bottom): reel out / detach when SWINGING
 
 **MODE · AIM** *(hard-to-master depth)*

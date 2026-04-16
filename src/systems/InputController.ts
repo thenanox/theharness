@@ -26,7 +26,6 @@ export interface InputState {
   reelDown: boolean;
   // One-shot
   firePressed: boolean;
-  jumpPressed: boolean;
   detachPressed: boolean;
   // Preview: true when the player is currently holding a pre-aim drag
   // (mobile Aim mode only). The scene uses this to draw the aim guide.
@@ -59,6 +58,12 @@ export class InputController {
 
   private touchZones: TouchZone[] = [];
 
+  /** Touch-button hold state. Kept separate so sample() can OR it with the
+   *  keyboard — otherwise the per-frame keyboard read would overwrite flags
+   *  that TouchControls sets on pointerdown.
+   */
+  private touchHold = { left: false, right: false, reelUp: false, reelDown: false };
+
   /** Mobile-only aim state for pre-aim drag. */
   private dragStartAt = 0;
   private dragPointerId: number | null = null;
@@ -73,7 +78,6 @@ export class InputController {
     reelUp: false,
     reelDown: false,
     firePressed: false,
-    jumpPressed: false,
     detachPressed: false,
     aiming: false,
   };
@@ -163,12 +167,11 @@ export class InputController {
       this.state.firePressed = true;
       this.state.detachPressed = true;
     });
-    kb.on('keydown-UP', () => {
-      this.state.jumpPressed = true;
-    });
-    kb.on('keydown-W', () => {
-      this.state.jumpPressed = true;
-    });
+  }
+
+  /** Called by TouchControls on pointer down/up on a hold button. */
+  setTouchHold(key: 'left' | 'right' | 'reelUp' | 'reelDown', held: boolean): void {
+    this.touchHold[key] = held;
   }
 
   /** Called by TouchControls so tap-to-fire ignores taps on buttons. */
@@ -228,16 +231,15 @@ export class InputController {
       }
     }
 
-    this.state.left = this.keys.A.isDown || this.keys.LEFT.isDown;
-    this.state.right = this.keys.D.isDown || this.keys.RIGHT.isDown;
-    this.state.reelUp = this.keys.W.isDown || this.keys.UP.isDown;
-    this.state.reelDown = this.keys.S.isDown || this.keys.DOWN.isDown;
+    this.state.left     = this.touchHold.left     || this.keys.A.isDown || this.keys.LEFT.isDown;
+    this.state.right    = this.touchHold.right    || this.keys.D.isDown || this.keys.RIGHT.isDown;
+    this.state.reelUp   = this.touchHold.reelUp   || this.keys.W.isDown || this.keys.UP.isDown;
+    this.state.reelDown = this.touchHold.reelDown || this.keys.S.isDown || this.keys.DOWN.isDown;
   }
 
   /** Call at end of update after consumers have read one-shots. */
   clearOneShots(): void {
     this.state.firePressed = false;
-    this.state.jumpPressed = false;
     this.state.detachPressed = false;
   }
 }

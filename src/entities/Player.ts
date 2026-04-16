@@ -19,7 +19,6 @@ export class Player {
   private lastVyForLanding  = 0;
   private sliding           = false;
   private squashActive      = false;
-  private jumpBufferedAt    = -Infinity;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
@@ -108,10 +107,6 @@ export class Player {
 
     if (this.sliding && Math.hypot(v.x, v.y) < 0.5) this.sliding = false;
 
-    // Jump buffer: tapping just before landing still fires.
-    if (input.jumpPressed) this.jumpBufferedAt = now;
-    const jumpBuffered = now - this.jumpBufferedAt < 90;
-
     if (!this.sliding) {
       if (grounded && !isSwinging) {
         const targetVx = input.left ? -2.8 : input.right ? 2.8 : 0;
@@ -124,13 +119,6 @@ export class Player {
         if (fx !== 0) this.applyForce(fx * PHYSICS.rope.swingPump, 0);
       }
       // Airborne without rope: NO arrow-key control — gravity only (Worms-faithful).
-
-      if (jumpBuffered && grounded && !isSwinging) {
-        this.setVelocity(v.x, -8.5);
-        this.lastGroundedAt = 0;
-        this.jumpBufferedAt = -Infinity;
-        this.squashStretch(0.84, 1.22, 100);
-      }
     }
 
     const speed = Math.hypot(v.x, v.y);

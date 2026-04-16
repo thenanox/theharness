@@ -47,18 +47,20 @@ Allow ~1-2 minutes after a push for the deployment to go live.
 ## Controls
 
 ### Desktop
-- **Mouse aim + left click / space**: fire rope (or detach if swinging)
-- **W / up**: reel in (jump when grounded)
+- **A / D / arrows**: rotate aim (IDLE) / pendulum pump (SWINGING) / walk (grounded)
+- **Space / left click**: fire rope (IDLE) / detach (SWINGING)
+- **W / up**: reel in
 - **S / down**: reel out
-- **A / D / arrows**: walk, air nudge
-- **Right-click / space**: hard detach
+- **Right-click**: hard detach
+
+No jump button — the rope is the only way up.
 
 ### Mobile (touch) — two modes, `ⓘ MODE` toggle top-left
 
 **MODE · TAP** _(default, easy)_
 - Tap anywhere: fire rope at tap point (or detach if already swinging)
-- Bottom-left `◄ ►`: walk / swing pump
-- Bottom-right `▲`: reel in (jump when grounded)
+- Bottom-left `◄ ►`: rotate aim (IDLE) / swing pump (SWINGING) / walk (grounded)
+- Bottom-right `▲`: reel in (also fires rope if IDLE)
 - Bottom-right `▼`: reel out (detach when swinging)
 
 **MODE · AIM** _(hard-to-master depth)_
