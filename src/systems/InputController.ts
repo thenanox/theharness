@@ -119,10 +119,12 @@ export class InputController {
       }
 
       // Default (desktop click or mobile tap mode): fire at pointer.
+      // Both flags are set so GameScene can fire when IDLE or detach when SWINGING.
       if (p.leftButtonDown()) {
         this.state.aimX = p.worldX;
         this.state.aimY = p.worldY;
         this.state.firePressed = true;
+        if (this.isTouchDevice()) this.state.detachPressed = true;
       }
     });
 
@@ -141,9 +143,9 @@ export class InputController {
       if (this.dragPointerId !== null && p.id === this.dragPointerId) {
         this.state.aimX = p.worldX;
         this.state.aimY = p.worldY;
-        // Release is a fire regardless of aim/quick-tap — the scene decides
-        // whether it's a fire or a detach based on rope state.
+        // Both flags: fire when IDLE, detach when SWINGING — GameScene decides.
         this.state.firePressed = true;
+        this.state.detachPressed = true;
         this.state.aiming = false;
         this.dragPointerId = null;
         this.dragResolvedAsAim = false;

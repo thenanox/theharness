@@ -151,7 +151,8 @@ export class TouchControls {
     };
     bg.on('pointerup', release);
     bg.on('pointerupoutside', release);
-    bg.on('pointerout', release);
+    // pointerout is intentionally omitted: on mobile, any slight finger movement
+    // fires pointerout and would immediately release the button while still held.
 
     this.root.add([bg, text]);
   }
