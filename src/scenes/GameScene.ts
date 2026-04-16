@@ -227,51 +227,94 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '12px', color: '#ff7a3d',
     }).setOrigin(0.5, 0).setAlpha(0.9);
 
-    slab(W * 0.5,  4820, W * 0.55, T, THEME.palette.moss,  301);
-    slab(W * 0.2,  4660, W * 0.30, T, THEME.palette.stone, 305);
-    slab(W * 0.8,  4600, W * 0.25, T, THEME.palette.stone, 307);
-    slab(W * 0.5,  4450, W * 0.40, T, THEME.palette.moss,  311);
+    // ── ZONE: START (y ≈ 5000..4200) — warmup, generous ledges ──────────────
+    // Teach: walk, jump, first rope fire. Falls are cheap here.
+    slab(W * 0.32, 4850, W * 0.38, T, THEME.palette.moss,  301);
+    slab(W * 0.78, 4760, W * 0.22, T, THEME.palette.stone, 305);
+    slab(W * 0.45, 4660, W * 0.18, T, THEME.palette.stone, 309);
+    slab(W * 0.18, 4540, W * 0.16, T, THEME.palette.moss,  313);
+    // First overhead anchor — invite a rope fire to pass into Boiler Hall.
+    slab(W * 0.70, 4380, W * 0.14, T, THEME.palette.stone, 317);
+    slab(W * 0.28, 4260, W * 0.12, T, THEME.palette.stone, 321);
 
-    slab(W * 0.15, 4100, W * 0.22, T, THEME.palette.stone, 401);
-    slab(W * 0.85, 4000, W * 0.22, T, THEME.palette.stone, 403);
-    slab(W * 0.5,  3870, W * 0.35, T, THEME.palette.moss,  407);
-    slab(W * 0.2,  3720, W * 0.28, T, THEME.palette.stone, 411);
-    slab(W * 0.8,  3600, W * 0.28, T, THEME.palette.stone, 413);
-    slab(W * 0.5,  3440, W * 0.35, T, THEME.palette.ice,   417);
-    slab(W * 0.15, 3300, W * 0.22, T, THEME.palette.stone, 421);
+    // ── ZONE: BOILER HALL (y ≈ 4200..3200) — boiler pillars, zig-zag pinch ──
+    // Signature: two thick vertical "boiler" pillars block straight-up rope
+    // lines. The player MUST swing around them. Ledges are narrow and
+    // alternate walls — a miss drops through several tiers.
+    // First boiler pillar (left-of-center, mid-air hanging).
+    slab(W * 0.38, 4080, W * 0.10, 190, THEME.palette.stone, 401);
+    slab(W * 0.10, 4040, W * 0.12, T,   THEME.palette.stone, 405); // tight against left wall
+    slab(W * 0.88, 3930, W * 0.12, T,   THEME.palette.stone, 409); // tight against right wall
+    slab(W * 0.50, 3790, W * 0.08, T,   THEME.palette.moss,  413); // micro middle ledge
+    // Second boiler pillar (right-of-center, offset).
+    slab(W * 0.62, 3660, W * 0.10, 170, THEME.palette.stone, 417);
+    slab(W * 0.18, 3600, W * 0.10, T,   THEME.palette.stone, 421); // force cross-swing left→right
+    slab(W * 0.85, 3450, W * 0.10, T,   THEME.palette.ice,   425); // slick ice — don't overshoot
+    slab(W * 0.35, 3340, W * 0.10, T,   THEME.palette.stone, 429);
+    slab(W * 0.12, 3240, W * 0.10, T,   THEME.palette.moss,  433); // last ledge of zone, tiny
 
-    slab(W * 0.5,  3150, W * 0.18, 200, THEME.palette.stone, 501);
-    slab(W * 0.15, 3000, W * 0.22, T,   THEME.palette.moss,  505);
-    slab(W * 0.85, 2870, W * 0.22, T,   THEME.palette.stone, 507);
-    slab(W * 0.5,  2720, W * 0.30, T,   THEME.palette.stone, 511);
-    slab(W * 0.15, 2580, W * 0.22, T,   THEME.palette.ice,   513);
-    slab(W * 0.8,  2450, W * 0.28, T,   THEME.palette.stone, 517);
-    slab(W * 0.4,  2300, W * 0.35, T,   THEME.palette.moss,  521);
+    // ── ZONE: GAUGE SHAFTS (y ≈ 3200..2200) — hair-thin gauge columns ───────
+    // Signature: two tall thin vertical "gauge" columns act as the only
+    // anchors. Landing ledges are bullseye-small. Reel-in precision required.
+    slab(W * 0.25, 3100, W * 0.06, 240, THEME.palette.stone, 501); // left gauge column
+    slab(W * 0.75, 3040, W * 0.06, 220, THEME.palette.stone, 505); // right gauge column (offset Y)
+    slab(W * 0.50, 3020, W * 0.07, T,   THEME.palette.ice,   509); // thread-the-needle center
+    slab(W * 0.12, 2870, W * 0.08, T,   THEME.palette.stone, 513); // tiny far-left
+    slab(W * 0.88, 2740, W * 0.08, T,   THEME.palette.stone, 517); // tiny far-right
+    slab(W * 0.50, 2600, W * 0.06, T,   THEME.palette.ice,   521); // BULLSEYE — 29px landing
+    slab(W * 0.22, 2460, W * 0.09, T,   THEME.palette.stone, 525);
+    slab(W * 0.78, 2340, W * 0.09, T,   THEME.palette.moss,  529);
+    // Recovery ledge + needle anchor for Ignition entry.
+    slab(W * 0.45, 2250, W * 0.16, T,   THEME.palette.stone, 533); // the only "safe" ledge
+    slab(W * 0.50, 2130, W * 0.05, 130, THEME.palette.ice,   537); // needle anchor column
 
-    slab(W * 0.85, 2150, W * 0.22, T,   THEME.palette.stone, 601);
-    slab(W * 0.15, 2000, W * 0.22, T,   THEME.palette.stone, 603);
-    slab(W * 0.6,  1850, W * 0.25, T,   THEME.palette.ice,   607);
-    slab(W * 0.5,  1700, W * 0.16, 150, THEME.palette.stone, 611);
-    slab(W * 0.15, 1580, W * 0.22, T,   THEME.palette.moss,  615);
-    slab(W * 0.85, 1450, W * 0.22, T,   THEME.palette.stone, 619);
-    slab(W * 0.4,  1300, W * 0.28, T,   THEME.palette.stone, 623);
+    // ── ZONE: IGNITION CHAMBER (y ≈ 2200..1200) — funnel & drop traps ───────
+    // Signature: wall-mounted ceiling overhangs narrow the aim cone; anchors
+    // are sparse; one "invite" ledge is a trap that fires you into a wall
+    // bounce if over-swung. This is the zone designed to break the player.
+    // Overhangs hang DOWN from ledges above — they block vertical rope lines.
+    slab(W * 0.16, 2020, W * 0.30, T,   THEME.palette.stone, 601); // left overhang (wall-anchored)
+    slab(W * 0.84, 1940, W * 0.30, T,   THEME.palette.stone, 605); // right overhang (wall-anchored)
+    // The ONLY anchor in the funnel gap — commit or fall.
+    slab(W * 0.50, 1800, W * 0.07, T,   THEME.palette.ice,   609);
+    // TRAP: wide moss ledge hugs the left wall — overshoot = sidewall bounce.
+    slab(W * 0.17, 1670, W * 0.22, T,   THEME.palette.moss,  613);
+    // Sparse far-right pocket — hard pendulum target.
+    slab(W * 0.86, 1540, W * 0.10, T,   THEME.palette.stone, 617);
+    // Lone mid-air anchor column (tiny) — must detach at apex precisely.
+    slab(W * 0.48, 1430, W * 0.05, 90,  THEME.palette.ice,   621);
+    // Pinch overhang — drops ceiling low again.
+    slab(W * 0.30, 1340, W * 0.24, T,   THEME.palette.stone, 625);
+    // Final Ignition Chamber ledge — tight, on the right.
+    slab(W * 0.80, 1240, W * 0.12, T,   THEME.palette.stone, 629);
 
-    slab(W * 0.8,  1150, W * 0.30, T,   THEME.palette.stone, 701);
-    slab(W * 0.2,  1000, W * 0.30, T,   THEME.palette.stone, 703);
-    slab(W * 0.55, 860,  W * 0.22, T,   THEME.palette.moss,  707);
-    slab(W * 0.5,  700,  W * 0.18, 140, THEME.palette.stone, 711);
-    slab(W * 0.15, 580,  W * 0.22, T,   THEME.palette.stone, 715);
-    slab(W * 0.85, 440,  W * 0.22, T,   THEME.palette.ice,   719);
-    slab(W * 0.5,  300,  W * 0.35, T,   THEME.palette.moss,  723);
+    // ── ZONE: CORE (y ≈ 1200..32) — ceiling-anchor gauntlet ─────────────────
+    // Signature: almost no floor platforms. Climb via ceiling-only anchors.
+    // One miss here = fall all the way back down through Ignition Chamber.
+    slab(W * 0.50, 1140, W * 0.05, 100, THEME.palette.stone, 701); // central hang column
+    slab(W * 0.15, 1050, W * 0.10, T,   THEME.palette.moss,  705);
+    slab(W * 0.86, 950,  W * 0.10, T,   THEME.palette.stone, 709);
+    slab(W * 0.50, 850,  W * 0.05, 80,  THEME.palette.ice,   713); // needle anchor
+    slab(W * 0.22, 730,  W * 0.08, T,   THEME.palette.stone, 717);
+    slab(W * 0.80, 620,  W * 0.08, T,   THEME.palette.stone, 721);
+    // Final ceiling overhangs just below the ignition socket.
+    slab(W * 0.28, 470, W * 0.22, T,    THEME.palette.stone, 725);
+    slab(W * 0.72, 380, W * 0.22, T,    THEME.palette.stone, 729);
+    slab(W * 0.50, 250, W * 0.08, T,    THEME.palette.moss,  733);
+    // Last precision catch before ignition — 29px wide, centered.
+    slab(W * 0.50, 130, W * 0.06, T,    THEME.palette.ice,   737);
   }
 
   private paintTowerDecor(W: number, H: number): void {
     for (let y = 200; y < H; y += 320) this.fx.paintRivetRow(W * 0.5, y, W - 48, 2000 + y);
-    this.fx.paintPipeRun(W * 0.2, 4660, W * 0.8, 4600, 3001);
-    this.fx.paintPipeRun(W * 0.2, 3720, W * 0.8, 3600, 3003);
-    this.fx.paintPipeRun(W * 0.2, 3000, W * 0.8, 2870, 3005);
-    this.fx.paintPipeRun(W * 0.8, 2150, W * 0.2, 2000, 3007);
-    this.fx.paintPipeRun(W * 0.8, 1450, W * 0.2, 1580, 3009);
+    // Pipe runs trace the zone transitions, linking the new pillar positions.
+    this.fx.paintPipeRun(W * 0.1, 4540, W * 0.78, 4380, 3001); // Start → Boiler
+    this.fx.paintPipeRun(W * 0.1, 4040, W * 0.88, 3930, 3003); // Boiler zig-zag
+    this.fx.paintPipeRun(W * 0.18, 3600, W * 0.85, 3450, 3005); // Boiler upper
+    this.fx.paintPipeRun(W * 0.25, 3100, W * 0.75, 3040, 3007); // Gauge columns bridge
+    this.fx.paintPipeRun(W * 0.22, 2460, W * 0.78, 2340, 3009); // Gauge upper
+    this.fx.paintPipeRun(W * 0.16, 2020, W * 0.84, 1940, 3011); // Ignition overhangs
+    this.fx.paintPipeRun(W * 0.30, 1340, W * 0.80, 1240, 3013); // Ignition top pinch
 
     const dialY = [400, 800, 1100, 1600, 1900, 2400, 2700, 3100, 3500, 3900, 4300, 4700];
     dialY.forEach((y, i) => {
