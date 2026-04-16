@@ -19,6 +19,7 @@ export class Player {
   private lastVyForLanding  = 0;
   private sliding           = false;
   private squashActive      = false;
+  private jumpBufferedAt    = -Infinity;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
@@ -59,7 +60,7 @@ export class Player {
     }
   }
 
-  isGrounded(now: number): boolean { return now - this.lastGroundedAt < 80; }
+  isGrounded(now: number): boolean { return now - this.lastGroundedAt < 110; }
   isSliding():  boolean            { return this.sliding; }
 
   private currentPhosphorColor: number = THEME.palette.phosphorBase;
@@ -90,7 +91,7 @@ export class Player {
       this.scene.tweens.add({
         targets: this.gfx,
         fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
-        duration: 400, ease: 'Cubic.easeOut',
+        duration: 280, ease: 'Cubic.easeOut',
       });
     }
   }
@@ -107,22 +108,27 @@ export class Player {
 
     if (this.sliding && Math.hypot(v.x, v.y) < 0.5) this.sliding = false;
 
+    // Jump buffer: tapping just before landing still fires.
+    if (input.jumpPressed) this.jumpBufferedAt = now;
+    const jumpBuffered = now - this.jumpBufferedAt < 90;
+
     if (!this.sliding) {
       if (grounded && !isSwinging) {
         const targetVx = input.left ? -2.8 : input.right ? 2.8 : 0;
-        const blend    = targetVx === 0 ? 0.55 : 0.22;
+        // Asymmetric blend: snappier accel, strong stop, crisp reversal.
+        const reversing = targetVx !== 0 && Math.sign(targetVx) !== Math.sign(v.x) && v.x !== 0;
+        const blend     = targetVx === 0 ? 0.55 : reversing ? 0.38 : 0.30;
         this.setVelocity(v.x + (targetVx - v.x) * blend, v.y);
       } else if (isSwinging) {
         const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
         if (fx !== 0) this.applyForce(fx * PHYSICS.rope.swingPump, 0);
-      } else {
-        const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-        if (fx !== 0) this.applyForce(fx * 0.0008, 0);
       }
+      // Airborne without rope: NO arrow-key control — gravity only (Worms-faithful).
 
-      if (input.jumpPressed && grounded && !isSwinging) {
+      if (jumpBuffered && grounded && !isSwinging) {
         this.setVelocity(v.x, -8.5);
         this.lastGroundedAt = 0;
+        this.jumpBufferedAt = -Infinity;
         this.squashStretch(0.84, 1.22, 100);
       }
     }
