@@ -37,8 +37,8 @@ export class GameScene extends Phaser.Scene {
   // Platform graphics for zone tinting
   private platformGfxList: Phaser.GameObjects.Graphics[] = [];
 
-  // Zone / phosphor state
-  private phosphorColor = ZONES[ZONES.length - 1].phosphor;
+  // Zone / phosphor state — typed as number so lerpColor can write to it
+  private phosphorColor: number = ZONES[ZONES.length - 1].phosphor;
   private currentZoneName = 'Start';
   private phosphorTween?: Phaser.Tweens.Tween;
 
@@ -74,9 +74,6 @@ export class GameScene extends Phaser.Scene {
     this.fx.paintMachineParallax(W, H);
     this.buildTower(W, H);
     this.paintTowerDecor(W, H);
-
-    // Set initial tint on all platforms
-    this.platformGfxList.forEach(g => g.setTint(this.phosphorColor));
 
     const spawnY = H - 100;
     this.player = new Player(this, W / 2, spawnY);
@@ -294,7 +291,6 @@ export class GameScene extends Phaser.Scene {
       targets: obj, t: 1, duration: 800, ease: 'Sine.easeInOut',
       onUpdate: () => {
         this.phosphorColor = this.fx.lerpColor(startColor, targetColor, obj.t);
-        this.platformGfxList.forEach(g => g.setTint(this.phosphorColor));
         this.player.setPhosphorColor(this.phosphorColor);
       },
       onComplete: () => { this.phosphorColor = targetColor; },

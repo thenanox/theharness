@@ -362,7 +362,7 @@ export class VisualFX {
       const wTop = scrollY - 100;
       const wBot = scrollY + windowH + 100;
 
-      pool.forEach((p, idx) => {
+      pool.forEach((p) => {
         p.x += (p.vx + Math.sin(p.phase + playerY * 0.002) * 0.4) * dt;
         p.y += p.vy * dt;
         p.phase += dt * 1.2;
@@ -383,7 +383,7 @@ export class VisualFX {
         const screenY = p.y - scrollY;
         gfx.fillCircle(p.x, screenY, p.size);
       });
-      void cameraY; void idx;
+      void cameraY;
     };
     return { update, destroy: () => gfx.destroy() };
   }
