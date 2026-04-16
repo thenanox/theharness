@@ -62,8 +62,11 @@ export class Player {
   isGrounded(now: number): boolean { return now - this.lastGroundedAt < 80; }
   isSliding():  boolean            { return this.sliding; }
 
+  private currentPhosphorColor: number = THEME.palette.phosphorBase;
+
   /** Called from zone system when the phosphor color changes. */
   setPhosphorColor(color: number): void {
+    this.currentPhosphorColor = color;
     this.gfx.setFillStyle(color, 0.9);
     this.glowCircle.setFillStyle(color, 0.12);
   }
@@ -86,7 +89,7 @@ export class Player {
       this.sliding = true;
       this.scene.tweens.add({
         targets: this.gfx,
-        fillColor: { from: 0xcc3300, to: THEME.palette.phosphorBase },
+        fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
         duration: 400, ease: 'Cubic.easeOut',
       });
     }
