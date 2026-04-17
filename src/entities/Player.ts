@@ -18,6 +18,7 @@ export class Player {
   private lastGroundedAt    = 0;
   private lastVyForLanding  = 0;
   private sliding           = false;
+  private slideExpiresAt    = 0;
   private squashActive      = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -87,6 +88,7 @@ export class Player {
   triggerSlide(impactSpeed: number): void {
     if (impactSpeed >= PHYSICS.player.slideThreshold) {
       this.sliding = true;
+      this.slideExpiresAt = this.scene.time.now + PHYSICS.player.slideMinDuration;
       this.scene.tweens.add({
         targets: this.gfx,
         fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
@@ -103,7 +105,7 @@ export class Player {
   update(input: InputState, isSwinging: boolean): void {
     const v = this.body.velocity;
 
-    if (this.sliding && Math.hypot(v.x, v.y) < 0.5) this.sliding = false;
+    if (this.sliding && Math.hypot(v.x, v.y) < 0.5 && this.scene.time.now >= this.slideExpiresAt) this.sliding = false;
 
     if (!this.sliding) {
       if (isSwinging) {

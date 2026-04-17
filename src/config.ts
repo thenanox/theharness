@@ -32,6 +32,9 @@ export const PHYSICS = {
     // Below this: gentle landing, player stays in control.
     // Above this: player loses control until velocity reaches ~0.
     slideThreshold: 3.5,
+    // Minimum time (ms) controls stay locked after a hard landing.
+    // Ensures vertical falls (vx≈0 on impact) still have visible punishment.
+    slideMinDuration: 600,
   },
 
   rope: {

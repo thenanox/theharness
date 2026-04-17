@@ -180,7 +180,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 0).setScrollFactor(0).setDepth(200);
 
     this.slideText = this.add
-      .text(W / 2, GAME_H / 2 - 60, 'SLIDING — fire rope to recover', {
+      .text(W / 2, GAME_H / 2 - 60, 'SLIDING — wait to stop', {
         fontFamily: 'monospace', fontSize: '12px', color: '#ff4400',
       })
       .setOrigin(0.5).setScrollFactor(0).setDepth(200).setAlpha(0).setVisible(false);
@@ -207,7 +207,7 @@ export class GameScene extends Phaser.Scene {
 
     const slab = (x: number, y: number, w: number, h: number, _color: number, seed: number) => {
       const r = this.add.rectangle(x, y, w, h, 0, 0);
-      this.matter.add.gameObject(r, { isStatic: true, friction: 0.4, restitution: 0, label: 'platform' });
+      this.matter.add.gameObject(r, { isStatic: true, friction: 0.05, frictionStatic: 0, restitution: 0, label: 'platform' });
       const gfx = this.fx.paintPhosphorSlab(x, y, w, h, seed);
       this.platformGfxList.push(gfx);
     };
