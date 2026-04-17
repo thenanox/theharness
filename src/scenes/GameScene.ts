@@ -445,10 +445,6 @@ export class GameScene extends Phaser.Scene {
       inp.aimY = this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
     }
 
-    // Floor tunneling guard: rope constraint can pull player through static geometry.
-    // Auto-detach if the player descends to near floor level while swinging.
-    if (this.rope.state === 'SWINGING' && this.player.y > TOWER_H - 42) this.rope.detach(false);
-
     if (inp.firePressed   && this.rope.state === 'IDLE' && !this.player.isSliding()) this.rope.fireAt(inp.aimX, inp.aimY);
     if (inp.detachPressed && this.rope.state === 'SWINGING') this.rope.detach(true);
 

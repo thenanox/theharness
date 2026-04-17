@@ -6,15 +6,16 @@ import { THEME } from '../theme';
  * On-screen touch controls — portrait layout.
  *
  * Layout (portrait 480×854):
- *   Bottom-left  : ◄ ►   walk / swing pump   (two side-by-side circles)
- *   Bottom-right : ▲ ▼   reel in / reel out  (two stacked circles)
- *   Top-left     : mode toggle pill           (TAP | AIM)
+ *   Bottom-left  : virtual joystick — ◄►  swing pump / aim rotate
+ *                                   — ▲▼  reel in / reel out
+ *   Top-left     : mode toggle pill        (TAP | AIM)
  *
- * Buttons sit at 22% alpha when idle, brighten to ember on press.
- * Hidden on pure-mouse desktops unless ?touch=1 is in the URL.
+ * Fire/detach:
+ *   TAP mode  — tap anywhere on the arena
+ *   AIM mode  — hold to aim, release to fire; quick tap snaps-fires
  *
- * Touch zones are registered on InputController so tap-to-fire never
- * triggers under a button.
+ * The joystick zone is registered on InputController so arena-fire taps
+ * are never triggered under the joystick area.
  */
 export class TouchControls {
   private scene: Phaser.Scene;
@@ -33,72 +34,26 @@ export class TouchControls {
     }
 
     const { width, height } = scene.scale;
-    // Portrait layout: buttons sized relative to viewport.
-    // Base size: 72px on a 480px-wide canvas (scales with FIT).
-    const size = 72;
-    const gap = 10;
     const margin = 16;
 
-    // ── Bottom-left: walk pad ◄ ► ────────────────────────────────────────
-    const leftPadX = margin;
-    const btnY = height - margin - size;
-
-    this.makeHoldButton(
-      leftPadX,
-      btnY,
-      size,
-      '◄',
-      () => { input.setTouchHold('left', true); },
-      () => { input.setTouchHold('left', false); },
-    );
-    this.makeHoldButton(
-      leftPadX + size + gap,
-      btnY,
-      size,
-      '►',
-      () => { input.setTouchHold('right', true); },
-      () => { input.setTouchHold('right', false); },
-    );
-
-    // ── Bottom-right: reel pad ▲ / ▼ (stacked) ──────────────────────────
-    const rightX = width - margin - size;
-    const reelUpY   = height - margin - size * 2 - gap;
-    const reelDownY = height - margin - size;
-
-    this.makeHoldButton(
-      rightX,
-      reelUpY,
-      size,
-      '▲',
-      () => {
-        input.setTouchHold('reelUp', true);
-        // Also fires the rope when IDLE (firePressed is ignored by GameScene when SWINGING).
-        // Detach is done by tapping the arena (TAP mode) or lifting after aim (AIM mode).
-        input.state.firePressed = true;
-      },
-      () => { input.setTouchHold('reelUp', false); },
-    );
-    this.makeHoldButton(
-      rightX,
-      reelDownY,
-      size,
-      '▼',
-      () => { input.setTouchHold('reelDown', true); },
-      () => { input.setTouchHold('reelDown', false); },
-    );
+    // ── Bottom-left: virtual joystick ────────────────────────────────────
+    const joyR = 68;
+    const joyX = margin + joyR;
+    const joyY = height - margin - joyR;
+    this.makeJoystick(joyX, joyY, joyR, 26);
 
     // ── Top-left: TAP / AIM mode toggle ─────────────────────────────────
     this.makeModeToggle(margin, margin);
 
-    // ── Centered hint (fades after 8 s) ──────────────────────────────────
+    // ── Hint (fades after 8 s) ───────────────────────────────────────────
     const hint = scene.add
-      .text(width / 2, height - margin - size * 2 - gap * 3, 'tap to fire · ▲▼ to reel', {
+      .text(width / 2, joyY - joyR - 10, 'tap arena to fire · joystick to aim/reel', {
         fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#1b1c21',
+        fontSize: '10px',
+        color: '#f4efe6',
       })
       .setOrigin(0.5, 1)
-      .setAlpha(0.5)
+      .setAlpha(0.35)
       .setScrollFactor(0)
       .setDepth(1000);
 
@@ -111,48 +66,85 @@ export class TouchControls {
     });
   }
 
-  private makeHoldButton(
-    x: number,
-    y: number,
-    size: number,
-    label: string,
-    onDown: () => void,
-    onUp: () => void,
-  ): void {
-    this.input.registerTouchZone(x, y, size, size);
+  // ── Virtual joystick ───────────────────────────────────────────────────
 
-    const bg = this.scene.add
-      .circle(x + size / 2, y + size / 2, size / 2, THEME.palette.inkDeep, 0.22)
-      .setStrokeStyle(2, THEME.palette.inkDeep, 0.5)
+  private makeJoystick(cx: number, cy: number, baseR: number, stickR: number): void {
+    // Register as a touch zone so arena-fire taps are ignored here.
+    this.input.registerTouchZone(cx - baseR, cy - baseR, baseR * 2, baseR * 2);
+
+    const base = this.scene.add
+      .circle(cx, cy, baseR, THEME.palette.inkDeep, 0.18)
+      .setStrokeStyle(2, THEME.palette.inkDeep, 0.45)
       .setScrollFactor(0)
-      .setDepth(1000)
-      .setInteractive({ useHandCursor: true });
+      .setDepth(1000);
 
-    const text = this.scene.add
-      .text(x + size / 2, y + size / 2, label, {
-        fontFamily: 'monospace',
-        fontSize: '28px',
-        color: '#f4efe6',
-      })
-      .setOrigin(0.5)
+    const stick = this.scene.add
+      .circle(cx, cy, stickR, THEME.palette.inkDeep, 0.65)
       .setScrollFactor(0)
       .setDepth(1001);
 
-    bg.on('pointerdown', () => {
-      bg.setFillStyle(THEME.palette.accent, 0.5);
-      onDown();
-    });
-    const release = () => {
-      bg.setFillStyle(THEME.palette.inkDeep, 0.22);
-      onUp();
-    };
-    bg.on('pointerup', release);
-    bg.on('pointerupoutside', release);
-    // pointerout is intentionally omitted: on mobile, any slight finger movement
-    // fires pointerout and would immediately release the button while still held.
+    // Faint cardinal labels for orientation.
+    const d = baseR * 0.62;
+    const s = { fontFamily: 'monospace', fontSize: '14px', color: '#f4efe6' };
+    const lbl = (x: number, y: number, t: string) =>
+      this.scene.add.text(x, y, t, s).setOrigin(0.5).setAlpha(0.28).setScrollFactor(0).setDepth(1000);
 
-    this.root.add([bg, text]);
+    this.root.add([
+      base, stick,
+      lbl(cx - d, cy, '◄'), lbl(cx + d, cy, '►'),
+      lbl(cx, cy - d, '▲'), lbl(cx, cy + d, '▼'),
+    ]);
+
+    type Dir = 'left' | 'right' | 'reelUp' | 'reelDown';
+    const dirs: Dir[] = ['left', 'right', 'reelUp', 'reelDown'];
+    let activeId: number | null = null;
+
+    const reset = () => {
+      stick.setPosition(cx, cy);
+      base.setFillStyle(THEME.palette.inkDeep, 0.18);
+      dirs.forEach(k => this.input.setTouchHold(k, false));
+      activeId = null;
+    };
+
+    const move = (px: number, py: number) => {
+      const dx = px - cx, dy = py - cy;
+      const dist = Math.hypot(dx, dy);
+      const travel = Math.min(dist, baseR * 0.65);
+      const a = dist > 1 ? Math.atan2(dy, dx) : 0;
+      stick.setPosition(cx + Math.cos(a) * travel, cy + Math.sin(a) * travel);
+
+      const thr = baseR * 0.25;
+      this.input.setTouchHold('left',     dx < -thr);
+      this.input.setTouchHold('right',    dx >  thr);
+      this.input.setTouchHold('reelUp',   dy < -thr);
+      this.input.setTouchHold('reelDown', dy >  thr);
+    };
+
+    this.scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (activeId !== null) return;
+      if (Math.hypot(p.x - cx, p.y - cy) > baseR) return;
+      activeId = p.id;
+      base.setFillStyle(THEME.palette.accent, 0.28);
+      move(p.x, p.y);
+    });
+
+    this.scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (p.id !== activeId) return;
+      move(p.x, p.y);
+    });
+
+    this.scene.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (p.id !== activeId) return;
+      reset();
+    });
+
+    this.scene.input.on('pointerupoutside', (p: Phaser.Input.Pointer) => {
+      if (p.id !== activeId) return;
+      reset();
+    });
   }
+
+  // ── Mode toggle pill ───────────────────────────────────────────────────
 
   private makeModeToggle(x: number, y: number): void {
     const w = 110;
