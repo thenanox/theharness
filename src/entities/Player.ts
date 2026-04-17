@@ -30,7 +30,7 @@ export class Player {
       mass: PHYSICS.player.mass,
       frictionAir: PHYSICS.player.frictionAir,
       friction: PHYSICS.player.friction,
-      frictionStatic: 0.1,
+      frictionStatic: 0,   // must be 0: Matter uses max(a,b) so any player frictionStatic wins over wall's 0 and creates Spiderman grip
       restitution: PHYSICS.player.restitution,
       inertia: Infinity,
       label: 'player',

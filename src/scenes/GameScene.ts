@@ -143,25 +143,28 @@ export class GameScene extends Phaser.Scene {
     // ── Collision: slide + wall rebound ──────────────────────────────────
     this.matter.world.on(
       'collisionstart',
-      (event: {
-        pairs: Array<{
-          bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType;
-          collision: { normal: { x: number; y: number } };
-        }>;
-      }) => {
+      (event: { pairs: Array<{ bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType }> }) => {
         for (const pair of event.pairs) {
           const isA = pair.bodyA === this.player.body;
           const isB = pair.bodyB === this.player.body;
           if (!isA && !isB) continue;
-          if (this.rope.state === 'SWINGING') continue;
-          const v = this.player.body.velocity;
-          const speed = Math.hypot(v.x, v.y);
-          this.player.triggerSlide(speed);
+
           const other = isA ? pair.bodyB : pair.bodyA;
-          if (other.label === 'sidewall' && speed >= PHYSICS.player.slideThreshold) {
-            const n = pair.collision?.normal ?? { x: 0, y: 0 };
-            this.player.kickFromWall(isA ? -n.x : n.x, speed);
-            this.triggerShake(70, 0.004);
+          const v     = this.player.body.velocity;
+          const speed = Math.hypot(v.x, v.y);
+
+          if (other.label === 'sidewall') {
+            // Kick away from the wall using its center position — works at any
+            // speed and regardless of rope state (prevents Spiderman pinning).
+            const wallX = (other as unknown as { position: { x: number } }).position.x;
+            const nx = this.player.x > wallX ? 1 : -1;
+            this.player.kickFromWall(nx, speed);
+            if (speed >= PHYSICS.player.slideThreshold) this.triggerShake(70, 0.004);
+            // Slide punishment still applies when not on rope
+            if (this.rope.state !== 'SWINGING') this.player.triggerSlide(speed);
+          } else if (this.rope.state !== 'SWINGING') {
+            // Platform/floor: slide only when not swinging
+            this.player.triggerSlide(speed);
           }
         }
       },
