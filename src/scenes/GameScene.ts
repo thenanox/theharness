@@ -134,7 +134,7 @@ export class GameScene extends Phaser.Scene {
             const wallX = (other as unknown as { position: { x: number } }).position.x;
             const nx = this.player.x > wallX ? 1 : -1;
             const vx = this.player.body.velocity.x;
-            if (vx * nx <= 1.5) this.player.kickFromWall(nx, Math.abs(vx));
+            if (vx * nx <= 1.5) this.player.kickFromWall(nx);
           } else {
             // Platform / floor — mark grounded.
             if (this.player.body.velocity.y >= -0.1) {
@@ -164,13 +164,13 @@ export class GameScene extends Phaser.Scene {
           const speed = Math.hypot(v.x, v.y);
 
           if (other.label === 'sidewall') {
-            // Kick away from the wall using its center position — works at any
-            // speed and regardless of rope state (prevents Spiderman pinning).
             const wallX = (other as unknown as { position: { x: number } }).position.x;
             const nx = this.player.x > wallX ? 1 : -1;
-            this.player.kickFromWall(nx, speed);
+            // Relax constraint so it doesn't fight the bounce on first contact.
+            this.rope.relaxConstraintToFit();
+            // Billiard reflection: flip vx, preserve vy (up-left → up-right).
+            this.player.reflectOffWall(nx, 0.75);
             if (speed >= PHYSICS.player.slideThreshold) this.triggerShake(70, 0.004);
-            // Slide punishment still applies when not on rope
             if (this.rope.state !== 'SWINGING') this.player.triggerSlide(speed);
           } else if (this.rope.state !== 'SWINGING') {
             // Platform/floor: slide only when not swinging
@@ -220,7 +220,8 @@ export class GameScene extends Phaser.Scene {
 
     const sidewall = (x: number, y: number, w: number, h: number, _color: number, seed: number) => {
       const r = this.add.rectangle(x, y, w, h, 0, 0);
-      this.matter.add.gameObject(r, { isStatic: true, friction: 0, frictionStatic: 0, restitution: 0.3, label: 'sidewall' });
+      // restitution: 0 — we handle the billiard reflection ourselves in collisionstart
+      this.matter.add.gameObject(r, { isStatic: true, friction: 0, frictionStatic: 0, restitution: 0, label: 'sidewall' });
       const gfx = this.fx.paintPhosphorSlab(x, y, w, h, seed);
       this.platformGfxList.push(gfx);
     };
@@ -443,6 +444,10 @@ export class GameScene extends Phaser.Scene {
       inp.aimX = this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
       inp.aimY = this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
     }
+
+    // Floor tunneling guard: rope constraint can pull player through static geometry.
+    // Auto-detach if the player descends to near floor level while swinging.
+    if (this.rope.state === 'SWINGING' && this.player.y > TOWER_H - 42) this.rope.detach(false);
 
     if (inp.firePressed   && this.rope.state === 'IDLE' && !this.player.isSliding()) this.rope.fireAt(inp.aimX, inp.aimY);
     if (inp.detachPressed && this.rope.state === 'SWINGING') this.rope.detach(true);

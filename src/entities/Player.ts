@@ -107,10 +107,21 @@ export class Player {
     }
   }
 
-  kickFromWall(outwardNx: number, impactSpeed: number): void {
+  /**
+   * Billiard-style wall reflection: flip the horizontal component and preserve
+   * vertical velocity so up-left → left wall → up-right works naturally.
+   * Called from collisionstart (first contact frame).
+   */
+  reflectOffWall(outwardNx: number, restitution: number): void {
     const v = this.body.velocity;
-    // Stronger minimum (4) so rope tension can't pin player against wall.
-    this.setVelocity(outwardNx * Math.max(4, impactSpeed * 0.6), v.y);
+    const outV = Math.max(1.5, Math.abs(v.x) * restitution);
+    this.setVelocity(outwardNx * outV, v.y);
+  }
+
+  /** Sustained minimum push used in collisionactive when player lingers on a wall. */
+  kickFromWall(outwardNx: number): void {
+    const v = this.body.velocity;
+    this.setVelocity(outwardNx * Math.max(4, Math.abs(v.x) * 0.6), v.y);
   }
 
   applyFloorFriction(): void {

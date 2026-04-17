@@ -72,8 +72,8 @@ export class TouchControls {
       '▲',
       () => {
         input.setTouchHold('reelUp', true);
-        // Also fires the rope when IDLE (GameScene ignores firePressed when SWINGING,
-        // so this can't accidentally detach — ▼ is the explicit detach button).
+        // Also fires the rope when IDLE (firePressed is ignored by GameScene when SWINGING).
+        // Detach is done by tapping the arena (TAP mode) or lifting after aim (AIM mode).
         input.state.firePressed = true;
       },
       () => { input.setTouchHold('reelUp', false); },
@@ -83,10 +83,7 @@ export class TouchControls {
       reelDownY,
       size,
       '▼',
-      () => {
-        input.setTouchHold('reelDown', true);
-        input.state.detachPressed = true;
-      },
+      () => { input.setTouchHold('reelDown', true); },
       () => { input.setTouchHold('reelDown', false); },
     );
 
