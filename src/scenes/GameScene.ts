@@ -207,7 +207,7 @@ export class GameScene extends Phaser.Scene {
 
     const slab = (x: number, y: number, w: number, h: number, _color: number, seed: number) => {
       const r = this.add.rectangle(x, y, w, h, 0, 0);
-      this.matter.add.gameObject(r, { isStatic: true, friction: 0.05, frictionStatic: 0, restitution: 0, label: 'platform' });
+      this.matter.add.gameObject(r, { isStatic: true, friction: 0.02, frictionStatic: 0, restitution: 0, label: 'platform' });
       const gfx = this.fx.paintPhosphorSlab(x, y, w, h, seed);
       this.platformGfxList.push(gfx);
     };

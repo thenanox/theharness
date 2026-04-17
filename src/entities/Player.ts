@@ -19,6 +19,7 @@ export class Player {
   private lastVyForLanding  = 0;
   private sliding           = false;
   private slideExpiresAt    = 0;
+  private lastHorizSign     = 1;
   private squashActive      = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -89,6 +90,14 @@ export class Player {
     if (impactSpeed >= PHYSICS.player.slideThreshold) {
       this.sliding = true;
       this.slideExpiresAt = this.scene.time.now + PHYSICS.player.slideMinDuration;
+
+      // Worms tumble: convert impact into a horizontal skid so the character
+      // visibly slides rather than stopping dead. collisionstart fires after
+      // Matter resolves the collision, so velocity is safe to override here.
+      const vx = this.body.velocity.x;
+      const sign = Math.abs(vx) > 0.5 ? Math.sign(vx) : this.lastHorizSign;
+      this.setVelocity(sign * Math.max(Math.abs(vx), 3), 0);
+
       this.scene.tweens.add({
         targets: this.gfx,
         fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
@@ -104,6 +113,8 @@ export class Player {
 
   update(input: InputState, isSwinging: boolean): void {
     const v = this.body.velocity;
+
+    if (Math.abs(v.x) > 0.5) this.lastHorizSign = v.x > 0 ? 1 : -1;
 
     if (this.sliding && Math.hypot(v.x, v.y) < 0.5 && this.scene.time.now >= this.slideExpiresAt) this.sliding = false;
 

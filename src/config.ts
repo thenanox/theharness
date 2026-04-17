@@ -25,7 +25,7 @@ export const PHYSICS = {
   player: {
     mass: 1.0,
     frictionAir: 0.003,   // LOW — swing momentum must persist between arcs
-    friction: 0.08,
+    friction: 0.02,
     restitution: 0.0,
     maxSpeed: 15,         // px/frame — MUST be < platform thickness (24) to prevent tunneling
     // Speed threshold at collision that triggers the Worms-style slide punishment.
