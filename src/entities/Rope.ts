@@ -149,6 +149,23 @@ export class Rope {
     this.sm.detach();
   }
 
+  /**
+   * Called from collisionactive when player touches a sidewall while SWINGING.
+   * If the player is closer to the anchor than the constraint length, the rigid
+   * constraint would push them INTO the wall — a deadlock. Relaxing the length
+   * to the actual distance eliminates the push force so the wall bounce is free.
+   */
+  relaxConstraintToFit(): void {
+    if (!this.constraint || this.sm.state !== 'SWINGING') return;
+    const aw = this.sm.anchorWorld();
+    if (!aw) return;
+    const dist = Math.hypot(this.player.x - aw.x, this.player.y - aw.y);
+    if (dist < this.sm.length) {
+      this.sm.length = dist;
+      (this.constraint as unknown as { length: number }).length = dist;
+    }
+  }
+
   update(dtSeconds: number, input: InputState): void {
     if (this.sm.state === 'SWINGING' && this.constraint) {
       const newLen = this.sm.reelLength(input.reelUp, input.reelDown, dtSeconds);

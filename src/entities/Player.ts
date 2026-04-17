@@ -87,6 +87,7 @@ export class Player {
   }
 
   triggerSlide(impactSpeed: number): void {
+    if (this.sliding) return;
     if (impactSpeed >= PHYSICS.player.slideThreshold) {
       this.sliding = true;
       this.slideExpiresAt = this.scene.time.now + PHYSICS.player.slideMinDuration;
@@ -108,29 +109,41 @@ export class Player {
 
   kickFromWall(outwardNx: number, impactSpeed: number): void {
     const v = this.body.velocity;
-    this.setVelocity(outwardNx * Math.max(2, impactSpeed * 0.35), v.y);
+    // Stronger minimum (4) so rope tension can't pin player against wall.
+    this.setVelocity(outwardNx * Math.max(4, impactSpeed * 0.6), v.y);
+  }
+
+  applyFloorFriction(): void {
+    const vx = this.body.velocity.x;
+    if (Math.abs(vx) > 0.05) this.setVelocity(vx * 0.82, this.body.velocity.y);
   }
 
   update(input: InputState, isSwinging: boolean): void {
+    const now = this.scene.time.now;
     const v = this.body.velocity;
 
     if (Math.abs(v.x) > 0.5) this.lastHorizSign = v.x > 0 ? 1 : -1;
 
-    if (this.sliding && Math.hypot(v.x, v.y) < 0.5 && this.scene.time.now >= this.slideExpiresAt) this.sliding = false;
+    if (this.sliding) {
+      // Programmatic slide deceleration (Matter friction is 0; we control the rate).
+      if (Math.abs(v.x) > 0.05) this.setVelocity(v.x * 0.93, v.y);
+      if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.5 && now >= this.slideExpiresAt) {
+        this.sliding = false;
+      }
+    } else {
+      // Gentle floor braking when IDLE and grounded — prevents infinite drift.
+      if (!isSwinging && this.isGrounded(now)) this.applyFloorFriction();
 
-    if (!this.sliding) {
       if (isSwinging) {
         const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
         if (fx !== 0) this.applyForce(fx * PHYSICS.rope.swingPump, 0);
       }
-      // Ground: no walking — rope is the only locomotion.
-      // Airborne without rope: gravity only, no air control.
     }
 
-    const speed = Math.hypot(v.x, v.y);
+    const speed = Math.hypot(this.body.velocity.x, this.body.velocity.y);
     if (speed > PHYSICS.player.maxSpeed) {
       const s = PHYSICS.player.maxSpeed / speed;
-      this.setVelocity(v.x * s, v.y * s);
+      this.setVelocity(this.body.velocity.x * s, this.body.velocity.y * s);
     }
 
     this.dressing.setPosition(this.x, this.y);

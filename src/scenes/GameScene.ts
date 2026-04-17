@@ -117,7 +117,7 @@ export class GameScene extends Phaser.Scene {
     // Initial vignette
     this.fx.paintZoneVignette(this.vignetteGfx, GAME_W, GAME_H, this.phosphorColor, 1.0);
 
-    // ── Collision: grounded ───────────────────────────────────────────────
+    // ── Collision: sustained contact ─────────────────────────────────────
     this.matter.world.on(
       'collisionactive',
       (event: { pairs: Array<{ bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType }> }) => {
@@ -126,13 +126,24 @@ export class GameScene extends Phaser.Scene {
           const isB = pair.bodyB === this.player.body;
           if (!isA && !isB) continue;
           const other = isA ? pair.bodyB : pair.bodyA;
-          if (other.label === 'sidewall') continue;
-          if (this.player.body.velocity.y >= -0.1) {
-            const vy = this.player.body.velocity.y;
-            this.player.markGrounded(this.time.now);
-            if (vy > 6) {
-              this.fx.dustPuff(this.player.x, this.player.y + 14);
-              this.triggerShake(90, 0.006);
+
+          if (other.label === 'sidewall') {
+            // Relax rope constraint each frame so it never pushes player INTO wall.
+            this.rope.relaxConstraintToFit();
+            // Sustained outward kick — overcomes any residual rope tension.
+            const wallX = (other as unknown as { position: { x: number } }).position.x;
+            const nx = this.player.x > wallX ? 1 : -1;
+            const vx = this.player.body.velocity.x;
+            if (vx * nx <= 1.5) this.player.kickFromWall(nx, Math.abs(vx));
+          } else {
+            // Platform / floor — mark grounded.
+            if (this.player.body.velocity.y >= -0.1) {
+              const vy = this.player.body.velocity.y;
+              this.player.markGrounded(this.time.now);
+              if (vy > 6) {
+                this.fx.dustPuff(this.player.x, this.player.y + 14);
+                this.triggerShake(90, 0.006);
+              }
             }
           }
         }
@@ -202,7 +213,7 @@ export class GameScene extends Phaser.Scene {
 
     const slab = (x: number, y: number, w: number, h: number, _color: number, seed: number) => {
       const r = this.add.rectangle(x, y, w, h, 0, 0);
-      this.matter.add.gameObject(r, { isStatic: true, friction: 0.02, frictionStatic: 0, restitution: 0, label: 'platform' });
+      this.matter.add.gameObject(r, { isStatic: true, friction: 0, frictionStatic: 0, restitution: 0, label: 'platform' });
       const gfx = this.fx.paintPhosphorSlab(x, y, w, h, seed);
       this.platformGfxList.push(gfx);
     };
