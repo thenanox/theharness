@@ -101,24 +101,17 @@ export class Player {
   }
 
   update(input: InputState, isSwinging: boolean): void {
-    const now     = this.scene.time.now;
-    const grounded = this.isGrounded(now);
-    const v        = this.body.velocity;
+    const v = this.body.velocity;
 
     if (this.sliding && Math.hypot(v.x, v.y) < 0.5) this.sliding = false;
 
     if (!this.sliding) {
-      if (grounded && !isSwinging) {
-        const targetVx = input.left ? -2.8 : input.right ? 2.8 : 0;
-        // Asymmetric blend: snappier accel, strong stop, crisp reversal.
-        const reversing = targetVx !== 0 && Math.sign(targetVx) !== Math.sign(v.x) && v.x !== 0;
-        const blend     = targetVx === 0 ? 0.55 : reversing ? 0.38 : 0.30;
-        this.setVelocity(v.x + (targetVx - v.x) * blend, v.y);
-      } else if (isSwinging) {
+      if (isSwinging) {
         const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
         if (fx !== 0) this.applyForce(fx * PHYSICS.rope.swingPump, 0);
       }
-      // Airborne without rope: NO arrow-key control — gravity only (Worms-faithful).
+      // Ground: no walking — rope is the only locomotion.
+      // Airborne without rope: gravity only, no air control.
     }
 
     const speed = Math.hypot(v.x, v.y);

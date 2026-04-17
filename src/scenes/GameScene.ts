@@ -402,25 +402,44 @@ export class GameScene extends Phaser.Scene {
 
     // ── Aim ───────────────────────────────────────────────────────────────
     if (this.rope.state === 'IDLE') {
-      if (inp.left)  this.aimAngle -= PHYSICS.aim.rotateSpeed * dt;
-      if (inp.right) this.aimAngle += PHYSICS.aim.rotateSpeed * dt;
-      if (!this.input2.isTouchDevice()) {
-        const ptr = this.input.activePointer;
-        if (ptr.worldX !== this.lastMouseX || ptr.worldY !== this.lastMouseY) {
-          this.lastMouseX = ptr.worldX; this.lastMouseY = ptr.worldY;
-          const dx = ptr.worldX - this.player.x, dy = ptr.worldY - this.player.y;
-          if (Math.hypot(dx, dy) > 20) this.aimAngle = Math.atan2(dy, dx);
+      const grounded = this.player.isGrounded(this.time.now);
+      const sliding  = this.player.isSliding();
+
+      if (!sliding) {
+        if (grounded) {
+          // Grounded: left/right rotates the aim arm. No walking — rope is the only locomotion.
+          if (inp.left)  this.aimAngle -= PHYSICS.aim.rotateSpeed * dt;
+          if (inp.right) this.aimAngle += PHYSICS.aim.rotateSpeed * dt;
+          if (!this.input2.isTouchDevice()) {
+            const ptr = this.input.activePointer;
+            if (ptr.worldX !== this.lastMouseX || ptr.worldY !== this.lastMouseY) {
+              this.lastMouseX = ptr.worldX; this.lastMouseY = ptr.worldY;
+              const dx = ptr.worldX - this.player.x, dy = ptr.worldY - this.player.y;
+              if (Math.hypot(dx, dy) > 20) this.aimAngle = Math.atan2(dy, dx);
+            }
+          }
+        } else {
+          // Airborne without rope: aim auto-tracks velocity — 45° upward in
+          // direction of travel (Worms behavior). Player cannot steer the aim.
+          const vx = this.player.body.velocity.x;
+          if (Math.abs(vx) > 0.3) {
+            this.aimAngle = vx > 0 ? -Math.PI / 4 : -(3 * Math.PI) / 4;
+          } else {
+            this.aimAngle = -Math.PI / 2; // barely horizontal → straight up
+          }
         }
       }
+      // Sliding: aimAngle frozen, firePressed blocked below — all controls locked.
+
       inp.aimX = this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
       inp.aimY = this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
     }
 
-    if (inp.firePressed   && this.rope.state === 'IDLE')     this.rope.fireAt(inp.aimX, inp.aimY);
+    if (inp.firePressed   && this.rope.state === 'IDLE' && !this.player.isSliding()) this.rope.fireAt(inp.aimX, inp.aimY);
     if (inp.detachPressed && this.rope.state === 'SWINGING') this.rope.detach(true);
 
-    const playerInput = this.rope.state === 'IDLE'
-      ? { ...inp, left: false, right: false } : inp;
+    const playerInput = this.rope.state === 'SWINGING'
+      ? inp : { ...inp, left: false, right: false };
     this.player.update(playerInput, this.rope.state === 'SWINGING');
     this.rope.update(dt, inp);
 
@@ -450,7 +469,7 @@ export class GameScene extends Phaser.Scene {
 
     // ── Aim guide ─────────────────────────────────────────────────────────
     this.aimGuide.clear();
-    if (this.rope.state === 'IDLE') {
+    if (this.rope.state === 'IDLE' && !this.player.isSliding()) {
       this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, inp.aimX, inp.aimY, PHYSICS.rope.maxLength, false);
     }
 
