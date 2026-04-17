@@ -96,7 +96,7 @@ export class Player {
       // Matter resolves the collision, so velocity is safe to override here.
       const vx = this.body.velocity.x;
       const sign = Math.abs(vx) > 0.5 ? Math.sign(vx) : this.lastHorizSign;
-      this.setVelocity(sign * Math.max(Math.abs(vx), 3), 0);
+      this.setVelocity(sign * Math.max(Math.abs(vx), 6), 0);
 
       this.scene.tweens.add({
         targets: this.gfx,

@@ -32,7 +32,6 @@ export class GameScene extends Phaser.Scene {
 
   private hudText!:    Phaser.GameObjects.Text;
   private heightText!: Phaser.GameObjects.Text;
-  private slideText!:  Phaser.GameObjects.Text;
 
   // Platform graphics for zone tinting
   private platformGfxList: Phaser.GameObjects.Graphics[] = [];
@@ -75,7 +74,7 @@ export class GameScene extends Phaser.Scene {
     this.buildTower(W, H);
     this.paintTowerDecor(W, H);
 
-    const spawnY = H - 100;
+    const spawnY = H - 42; // floor top (H-28) minus player half-height (14)
     this.player = new Player(this, W / 2, spawnY);
     this.rope   = new Rope(this, this.player, this.fx);
 
@@ -179,11 +178,7 @@ export class GameScene extends Phaser.Scene {
       .text(W / 2, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ff7a3d' })
       .setOrigin(0.5, 0).setScrollFactor(0).setDepth(200);
 
-    this.slideText = this.add
-      .text(W / 2, GAME_H / 2 - 60, 'SLIDING — wait to stop', {
-        fontFamily: 'monospace', fontSize: '12px', color: '#ff4400',
-      })
-      .setOrigin(0.5).setScrollFactor(0).setDepth(200).setAlpha(0).setVisible(false);
+
 
     const hint = this.add
       .text(W / 2, GAME_H - 28, 'A/D aim · SPACE fire/detach · W/S reel · ◄► mobile aim',
@@ -509,11 +504,8 @@ export class GameScene extends Phaser.Scene {
     this.heightText.setText(metersLeft > 0 ? `${metersLeft} m` : 'CLIMB!');
     this.heightText.setColor(this.phosphorColor > 0x888800 ? '#ff7a3d' : `#${this.phosphorColor.toString(16).padStart(6, '0')}`);
 
-    const sliding = this.player.isSliding();
-    this.slideText.setVisible(sliding).setAlpha(sliding ? 0.9 : 0);
-
     this.hudText.setText(
-      `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${sliding ? '  SLIDING' : ''}`,
+      `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${this.player.isSliding() ? '  SLIDING' : ''}`,
     );
 
     this.input2.clearOneShots();
