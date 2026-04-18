@@ -99,17 +99,20 @@ export class TouchControls {
     const dirs: Dir[] = ['left', 'right', 'reelUp', 'reelDown'];
     let activeId: number | null = null;
 
+    const travelR = baseR * 0.65; // full deflection = intensity 1.0
+
     const reset = () => {
       stick.setPosition(cx, cy);
       base.setFillStyle(THEME.palette.inkDeep, 0.18);
       dirs.forEach(k => this.input.setTouchHold(k, false));
+      this.input.clearJoyAnalog();
       activeId = null;
     };
 
     const move = (px: number, py: number) => {
       const dx = px - cx, dy = py - cy;
       const dist = Math.hypot(dx, dy);
-      const travel = Math.min(dist, baseR * 0.65);
+      const travel = Math.min(dist, travelR);
       const a = dist > 1 ? Math.atan2(dy, dx) : 0;
       stick.setPosition(cx + Math.cos(a) * travel, cy + Math.sin(a) * travel);
 
@@ -118,6 +121,11 @@ export class TouchControls {
       this.input.setTouchHold('right',    dx >  thr);
       this.input.setTouchHold('reelUp',   dy < -thr);
       this.input.setTouchHold('reelDown', dy >  thr);
+
+      // Analog: normalize to [-1, 1] based on visual travel range.
+      const normX = Math.max(-1, Math.min(1, dx / travelR));
+      const normY = Math.max(-1, Math.min(1, dy / travelR));
+      this.input.setJoyAnalog(normX, normY);
     };
 
     this.scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {

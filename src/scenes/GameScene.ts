@@ -417,9 +417,8 @@ export class GameScene extends Phaser.Scene {
 
       if (!sliding) {
         if (grounded) {
-          // Grounded: left/right rotates the aim arm. No walking — rope is the only locomotion.
-          if (inp.left)  this.aimAngle -= PHYSICS.aim.rotateSpeed * dt;
-          if (inp.right) this.aimAngle += PHYSICS.aim.rotateSpeed * dt;
+          // Analog joystick / keyboard rotates the aim arm.
+          if (inp.joyX !== 0) this.aimAngle += inp.joyX * PHYSICS.aim.rotateSpeed * dt;
           if (!this.input2.isTouchDevice()) {
             const ptr = this.input.activePointer;
             if (ptr.worldX !== this.lastMouseX || ptr.worldY !== this.lastMouseY) {
@@ -435,14 +434,16 @@ export class GameScene extends Phaser.Scene {
           if (Math.abs(vx) > 0.3) {
             this.aimAngle = vx > 0 ? -Math.PI / 4 : -(3 * Math.PI) / 4;
           } else {
-            this.aimAngle = -Math.PI / 2; // barely horizontal → straight up
+            this.aimAngle = -Math.PI / 2;
           }
         }
       }
-      // Sliding: aimAngle frozen, firePressed blocked below — all controls locked.
 
-      inp.aimX = this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
-      inp.aimY = this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
+      // Desktop: fire target = angle arm. Mobile: fire target = tap coords set by pointer events.
+      if (!this.input2.isTouchDevice()) {
+        inp.aimX = this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
+        inp.aimY = this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
+      }
     }
 
     if (inp.firePressed   && this.rope.state === 'IDLE' && !this.player.isSliding()) this.rope.fireAt(inp.aimX, inp.aimY);
@@ -480,7 +481,14 @@ export class GameScene extends Phaser.Scene {
     // ── Aim guide ─────────────────────────────────────────────────────────
     this.aimGuide.clear();
     if (this.rope.state === 'IDLE' && !this.player.isSliding()) {
-      this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, inp.aimX, inp.aimY, PHYSICS.rope.maxLength, false);
+      // Guide direction: pointer during AIM drag; angle arm otherwise.
+      const gx = this.input2.isTouchDevice() && inp.aiming
+        ? inp.aimX
+        : this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
+      const gy = this.input2.isTouchDevice() && inp.aiming
+        ? inp.aimY
+        : this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
+      this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, gx, gy, PHYSICS.rope.maxLength, inp.aiming);
     }
 
     // ── Trajectory preview ────────────────────────────────────────────────

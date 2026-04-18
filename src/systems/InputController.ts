@@ -30,6 +30,10 @@ export interface InputState {
   // Preview: true when the player is currently holding a pre-aim drag
   // (mobile Aim mode only). The scene uses this to draw the aim guide.
   aiming: boolean;
+  // Analog joystick axes — range [-1, 1].
+  // Set by the virtual joystick on touch; derived from keyboard (±1) on desktop.
+  joyX: number;
+  joyY: number;
 }
 
 interface TouchZone {
@@ -80,7 +84,13 @@ export class InputController {
     firePressed: false,
     detachPressed: false,
     aiming: false,
+    joyX: 0,
+    joyY: 0,
   };
+
+  // True while the touch joystick has active analog input.
+  // Prevents sample() from overwriting the analog values with keyboard ±1.
+  private joySourceTouch = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -176,6 +186,20 @@ export class InputController {
     this.touchHold[key] = held;
   }
 
+  /** Called by the touch joystick with normalized [-1,1] values. */
+  setJoyAnalog(x: number, y: number): void {
+    this.joySourceTouch = true;
+    this.state.joyX = x;
+    this.state.joyY = y;
+  }
+
+  /** Called when the joystick is released. */
+  clearJoyAnalog(): void {
+    this.joySourceTouch = false;
+    this.state.joyX = 0;
+    this.state.joyY = 0;
+  }
+
   /** Called by TouchControls so tap-to-fire ignores taps on buttons. */
   registerTouchZone(x: number, y: number, w: number, h: number): void {
     this.touchZones.push({ x, y, w, h });
@@ -237,6 +261,12 @@ export class InputController {
     this.state.right    = this.touchHold.right    || this.keys.D.isDown || this.keys.RIGHT.isDown;
     this.state.reelUp   = this.touchHold.reelUp   || this.keys.W.isDown || this.keys.UP.isDown;
     this.state.reelDown = this.touchHold.reelDown || this.keys.S.isDown || this.keys.DOWN.isDown;
+
+    // Derive analog axes from keyboard when the touch joystick is not active.
+    if (!this.joySourceTouch) {
+      this.state.joyX = this.state.left ? -1 : this.state.right ? 1 : 0;
+      this.state.joyY = this.state.reelUp ? -1 : this.state.reelDown ? 1 : 0;
+    }
   }
 
   /** Call at end of update after consumers have read one-shots. */

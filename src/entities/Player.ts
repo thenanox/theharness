@@ -145,9 +145,8 @@ export class Player {
       // Gentle floor braking when IDLE and grounded — prevents infinite drift.
       if (!isSwinging && this.isGrounded(now)) this.applyFloorFriction();
 
-      if (isSwinging) {
-        const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-        if (fx !== 0) this.applyForce(fx * PHYSICS.rope.swingPump, 0);
+      if (isSwinging && input.joyX !== 0) {
+        this.applyForce(input.joyX * PHYSICS.rope.swingPump, 0);
       }
     }
 

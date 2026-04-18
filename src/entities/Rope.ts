@@ -168,7 +168,9 @@ export class Rope {
 
   update(dtSeconds: number, input: InputState): void {
     if (this.sm.state === 'SWINGING' && this.constraint) {
-      const newLen = this.sm.reelLength(input.reelUp, input.reelDown, dtSeconds);
+      // Scale reel speed by joystick deflection; keyboard always gives full speed (joyY = ±1).
+      const reelScale = input.joyY !== 0 ? Math.abs(input.joyY) : 1;
+      const newLen = this.sm.reelLength(input.reelUp, input.reelDown, dtSeconds * reelScale);
       // Mutate the constraint length in place — Matter reads it next step.
       (this.constraint as unknown as { length: number }).length = newLen;
     }
