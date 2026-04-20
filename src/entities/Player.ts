@@ -92,12 +92,13 @@ export class Player {
       this.sliding = true;
       this.slideExpiresAt = this.scene.time.now + PHYSICS.player.slideMinDuration;
 
-      // Worms tumble: convert impact into a horizontal skid so the character
-      // visibly slides rather than stopping dead. collisionstart fires after
-      // Matter resolves the collision, so velocity is safe to override here.
+      // Worms tumble: convert impact into a horizontal skid scaled by fall
+      // speed. Big falls = fast slides that can carry you off platform edges.
       const vx = this.body.velocity.x;
       const sign = Math.abs(vx) > 0.5 ? Math.sign(vx) : this.lastHorizSign;
-      this.setVelocity(sign * Math.max(Math.abs(vx), 6), 0);
+      const skidSpeed = Math.max(Math.abs(vx), Math.min(impactSpeed * 1.2, 12));
+      const bounce = -Math.min(impactSpeed * 0.25, 3);
+      this.setVelocity(sign * skidSpeed, bounce);
 
       this.scene.tweens.add({
         targets: this.gfx,
@@ -136,8 +137,8 @@ export class Player {
     if (Math.abs(v.x) > 0.5) this.lastHorizSign = v.x > 0 ? 1 : -1;
 
     if (this.sliding) {
-      // Programmatic slide deceleration (Matter friction is 0; we control the rate).
-      if (Math.abs(v.x) > 0.05) this.setVelocity(v.x * 0.93, v.y);
+      // Programmatic slide deceleration — 0.955 gives long punishing skids.
+      if (Math.abs(v.x) > 0.05) this.setVelocity(v.x * 0.955, v.y);
       if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.5 && now >= this.slideExpiresAt) {
         this.sliding = false;
       }

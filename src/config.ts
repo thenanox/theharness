@@ -31,10 +31,10 @@ export const PHYSICS = {
     // Speed threshold at collision that triggers the Worms-style slide punishment.
     // Below this: gentle landing, player stays in control.
     // Above this: player loses control until velocity reaches ~0.
-    slideThreshold: 3.5,
+    slideThreshold: 3.0,
     // Minimum time (ms) controls stay locked after a hard landing.
     // Ensures vertical falls (vx≈0 on impact) still have visible punishment.
-    slideMinDuration: 900,
+    slideMinDuration: 1200,
   },
 
   rope: {
@@ -47,7 +47,8 @@ export const PHYSICS = {
     detachImpulse: 0.010, // jump-off kick on detach
     // Horizontal pump force applied per physics step during swing.
     // INTENTIONALLY TINY: gravity is the engine, not arrow keys.
-    swingPump: 0.003,
+    // Reduced from 0.003 → 0.0018 to prevent easy 360s; needs 3-4 arcs to build real height.
+    swingPump: 0.0018,
   },
 
   aim: {

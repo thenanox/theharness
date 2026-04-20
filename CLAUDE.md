@@ -53,10 +53,13 @@ The rope mechanic is the game. Everything else is decoration.
 frictionAir      = 0.003   // low → swing momentum persists (correct)
 stiffness        = 1.0     // rigid — Worms rod, not bungee
 damping          = 0.01    // minimal → pendulum lasts
-reelSpeed        = 200     // px/s — fast enough to feel responsive
-swingPump        = 0.003   // per-frame nudge force during swing (intentionally tiny)
+reelSpeed        = 250     // px/s — fast enough to feel responsive
+swingPump        = 0.0018  // per-frame nudge force during swing (reduced from 0.003 to prevent easy 360s)
 detachImpulse    = 0.010   // kick on detach, with upward bias baked into the vector
 aim.rotateSpeed  = 2.6     // rad/s — ~150°/sec sweep when A/D held in IDLE
+slideThreshold   = 3.0     // speed at which hard landing triggers slide punishment
+slideMinDuration = 1200    // ms controls stay locked after a hard landing
+slideDeceleration= 0.955   // per-frame multiplier on horizontal slide velocity
 ```
 These are hard-won. Don't increase `swingPump` or `frictionAir` without testing.
 
