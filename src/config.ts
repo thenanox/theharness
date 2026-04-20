@@ -25,13 +25,16 @@ export const PHYSICS = {
   player: {
     mass: 1.0,
     frictionAir: 0.003,   // LOW — swing momentum must persist between arcs
-    friction: 0.08,
+    friction: 0,       // all friction handled programmatically for reliable control
     restitution: 0.0,
     maxSpeed: 15,         // px/frame — MUST be < platform thickness (24) to prevent tunneling
     // Speed threshold at collision that triggers the Worms-style slide punishment.
     // Below this: gentle landing, player stays in control.
     // Above this: player loses control until velocity reaches ~0.
     slideThreshold: 3.5,
+    // Minimum time (ms) controls stay locked after a hard landing.
+    // Ensures vertical falls (vx≈0 on impact) still have visible punishment.
+    slideMinDuration: 900,
   },
 
   rope: {

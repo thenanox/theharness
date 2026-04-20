@@ -18,6 +18,8 @@ export class Player {
   private lastGroundedAt    = 0;
   private lastVyForLanding  = 0;
   private sliding           = false;
+  private slideExpiresAt    = 0;
+  private lastHorizSign     = 1;
   private squashActive      = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -30,7 +32,7 @@ export class Player {
       mass: PHYSICS.player.mass,
       frictionAir: PHYSICS.player.frictionAir,
       friction: PHYSICS.player.friction,
-      frictionStatic: 0.1,
+      frictionStatic: 0,   // must be 0: Matter uses max(a,b) so any player frictionStatic wins over wall's 0 and creates Spiderman grip
       restitution: PHYSICS.player.restitution,
       inertia: Infinity,
       label: 'player',
@@ -85,8 +87,18 @@ export class Player {
   }
 
   triggerSlide(impactSpeed: number): void {
+    if (this.sliding) return;
     if (impactSpeed >= PHYSICS.player.slideThreshold) {
       this.sliding = true;
+      this.slideExpiresAt = this.scene.time.now + PHYSICS.player.slideMinDuration;
+
+      // Worms tumble: convert impact into a horizontal skid so the character
+      // visibly slides rather than stopping dead. collisionstart fires after
+      // Matter resolves the collision, so velocity is safe to override here.
+      const vx = this.body.velocity.x;
+      const sign = Math.abs(vx) > 0.5 ? Math.sign(vx) : this.lastHorizSign;
+      this.setVelocity(sign * Math.max(Math.abs(vx), 6), 0);
+
       this.scene.tweens.add({
         targets: this.gfx,
         fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
@@ -95,36 +107,53 @@ export class Player {
     }
   }
 
-  kickFromWall(outwardNx: number, impactSpeed: number): void {
+  /**
+   * Billiard-style wall reflection: flip the horizontal component and preserve
+   * vertical velocity so up-left → left wall → up-right works naturally.
+   * Called from collisionstart (first contact frame).
+   */
+  reflectOffWall(outwardNx: number, restitution: number): void {
     const v = this.body.velocity;
-    this.setVelocity(outwardNx * Math.max(2, impactSpeed * 0.35), v.y);
+    const outV = Math.max(1.5, Math.abs(v.x) * restitution);
+    this.setVelocity(outwardNx * outV, v.y);
+  }
+
+  /** Sustained minimum push used in collisionactive when player lingers on a wall. */
+  kickFromWall(outwardNx: number): void {
+    const v = this.body.velocity;
+    this.setVelocity(outwardNx * Math.max(4, Math.abs(v.x) * 0.6), v.y);
+  }
+
+  applyFloorFriction(): void {
+    const vx = this.body.velocity.x;
+    if (Math.abs(vx) > 0.05) this.setVelocity(vx * 0.82, this.body.velocity.y);
   }
 
   update(input: InputState, isSwinging: boolean): void {
-    const now     = this.scene.time.now;
-    const grounded = this.isGrounded(now);
-    const v        = this.body.velocity;
+    const now = this.scene.time.now;
+    const v = this.body.velocity;
 
-    if (this.sliding && Math.hypot(v.x, v.y) < 0.5) this.sliding = false;
+    if (Math.abs(v.x) > 0.5) this.lastHorizSign = v.x > 0 ? 1 : -1;
 
-    if (!this.sliding) {
-      if (grounded && !isSwinging) {
-        const targetVx = input.left ? -2.8 : input.right ? 2.8 : 0;
-        // Asymmetric blend: snappier accel, strong stop, crisp reversal.
-        const reversing = targetVx !== 0 && Math.sign(targetVx) !== Math.sign(v.x) && v.x !== 0;
-        const blend     = targetVx === 0 ? 0.55 : reversing ? 0.38 : 0.30;
-        this.setVelocity(v.x + (targetVx - v.x) * blend, v.y);
-      } else if (isSwinging) {
-        const fx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-        if (fx !== 0) this.applyForce(fx * PHYSICS.rope.swingPump, 0);
+    if (this.sliding) {
+      // Programmatic slide deceleration (Matter friction is 0; we control the rate).
+      if (Math.abs(v.x) > 0.05) this.setVelocity(v.x * 0.93, v.y);
+      if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.5 && now >= this.slideExpiresAt) {
+        this.sliding = false;
       }
-      // Airborne without rope: NO arrow-key control — gravity only (Worms-faithful).
+    } else {
+      // Gentle floor braking when IDLE and grounded — prevents infinite drift.
+      if (!isSwinging && this.isGrounded(now)) this.applyFloorFriction();
+
+      if (isSwinging && input.joyX !== 0) {
+        this.applyForce(input.joyX * PHYSICS.rope.swingPump, 0);
+      }
     }
 
-    const speed = Math.hypot(v.x, v.y);
+    const speed = Math.hypot(this.body.velocity.x, this.body.velocity.y);
     if (speed > PHYSICS.player.maxSpeed) {
       const s = PHYSICS.player.maxSpeed / speed;
-      this.setVelocity(v.x * s, v.y * s);
+      this.setVelocity(this.body.velocity.x * s, this.body.velocity.y * s);
     }
 
     this.dressing.setPosition(this.x, this.y);

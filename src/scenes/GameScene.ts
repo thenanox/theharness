@@ -32,7 +32,6 @@ export class GameScene extends Phaser.Scene {
 
   private hudText!:    Phaser.GameObjects.Text;
   private heightText!: Phaser.GameObjects.Text;
-  private slideText!:  Phaser.GameObjects.Text;
 
   // Platform graphics for zone tinting
   private platformGfxList: Phaser.GameObjects.Graphics[] = [];
@@ -75,7 +74,7 @@ export class GameScene extends Phaser.Scene {
     this.buildTower(W, H);
     this.paintTowerDecor(W, H);
 
-    const spawnY = H - 100;
+    const spawnY = H - 42; // floor top (H-28) minus player half-height (14)
     this.player = new Player(this, W / 2, spawnY);
     this.rope   = new Rope(this, this.player, this.fx);
 
@@ -118,7 +117,7 @@ export class GameScene extends Phaser.Scene {
     // Initial vignette
     this.fx.paintZoneVignette(this.vignetteGfx, GAME_W, GAME_H, this.phosphorColor, 1.0);
 
-    // ── Collision: grounded ───────────────────────────────────────────────
+    // ── Collision: sustained contact ─────────────────────────────────────
     this.matter.world.on(
       'collisionactive',
       (event: { pairs: Array<{ bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType }> }) => {
@@ -127,13 +126,24 @@ export class GameScene extends Phaser.Scene {
           const isB = pair.bodyB === this.player.body;
           if (!isA && !isB) continue;
           const other = isA ? pair.bodyB : pair.bodyA;
-          if (other.label === 'sidewall') continue;
-          if (this.player.body.velocity.y >= -0.1) {
-            const vy = this.player.body.velocity.y;
-            this.player.markGrounded(this.time.now);
-            if (vy > 6) {
-              this.fx.dustPuff(this.player.x, this.player.y + 14);
-              this.triggerShake(90, 0.006);
+
+          if (other.label === 'sidewall') {
+            // Relax rope constraint each frame so it never pushes player INTO wall.
+            this.rope.relaxConstraintToFit();
+            // Sustained outward kick — overcomes any residual rope tension.
+            const wallX = (other as unknown as { position: { x: number } }).position.x;
+            const nx = this.player.x > wallX ? 1 : -1;
+            const vx = this.player.body.velocity.x;
+            if (vx * nx <= 1.5) this.player.kickFromWall(nx);
+          } else {
+            // Platform / floor — mark grounded.
+            if (this.player.body.velocity.y >= -0.1) {
+              const vy = this.player.body.velocity.y;
+              this.player.markGrounded(this.time.now);
+              if (vy > 6) {
+                this.fx.dustPuff(this.player.x, this.player.y + 14);
+                this.triggerShake(90, 0.006);
+              }
             }
           }
         }
@@ -143,25 +153,28 @@ export class GameScene extends Phaser.Scene {
     // ── Collision: slide + wall rebound ──────────────────────────────────
     this.matter.world.on(
       'collisionstart',
-      (event: {
-        pairs: Array<{
-          bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType;
-          collision: { normal: { x: number; y: number } };
-        }>;
-      }) => {
+      (event: { pairs: Array<{ bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType }> }) => {
         for (const pair of event.pairs) {
           const isA = pair.bodyA === this.player.body;
           const isB = pair.bodyB === this.player.body;
           if (!isA && !isB) continue;
-          if (this.rope.state === 'SWINGING') continue;
-          const v = this.player.body.velocity;
-          const speed = Math.hypot(v.x, v.y);
-          this.player.triggerSlide(speed);
+
           const other = isA ? pair.bodyB : pair.bodyA;
-          if (other.label === 'sidewall' && speed >= PHYSICS.player.slideThreshold) {
-            const n = pair.collision?.normal ?? { x: 0, y: 0 };
-            this.player.kickFromWall(isA ? -n.x : n.x, speed);
-            this.triggerShake(70, 0.004);
+          const v     = this.player.body.velocity;
+          const speed = Math.hypot(v.x, v.y);
+
+          if (other.label === 'sidewall') {
+            const wallX = (other as unknown as { position: { x: number } }).position.x;
+            const nx = this.player.x > wallX ? 1 : -1;
+            // Relax constraint so it doesn't fight the bounce on first contact.
+            this.rope.relaxConstraintToFit();
+            // Billiard reflection: flip vx, preserve vy (up-left → up-right).
+            this.player.reflectOffWall(nx, 0.75);
+            if (speed >= PHYSICS.player.slideThreshold) this.triggerShake(70, 0.004);
+            if (this.rope.state !== 'SWINGING') this.player.triggerSlide(speed);
+          } else if (this.rope.state !== 'SWINGING') {
+            // Platform/floor: slide only when not swinging
+            this.player.triggerSlide(speed);
           }
         }
       },
@@ -176,11 +189,7 @@ export class GameScene extends Phaser.Scene {
       .text(W / 2, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ff7a3d' })
       .setOrigin(0.5, 0).setScrollFactor(0).setDepth(200);
 
-    this.slideText = this.add
-      .text(W / 2, GAME_H / 2 - 60, 'SLIDING — fire rope to recover', {
-        fontFamily: 'monospace', fontSize: '12px', color: '#ff4400',
-      })
-      .setOrigin(0.5).setScrollFactor(0).setDepth(200).setAlpha(0).setVisible(false);
+
 
     const hint = this.add
       .text(W / 2, GAME_H - 28, 'A/D aim · SPACE fire/detach · W/S reel · ◄► mobile aim',
@@ -204,14 +213,15 @@ export class GameScene extends Phaser.Scene {
 
     const slab = (x: number, y: number, w: number, h: number, _color: number, seed: number) => {
       const r = this.add.rectangle(x, y, w, h, 0, 0);
-      this.matter.add.gameObject(r, { isStatic: true, friction: 0.4, restitution: 0, label: 'platform' });
+      this.matter.add.gameObject(r, { isStatic: true, friction: 0, frictionStatic: 0, restitution: 0, label: 'platform' });
       const gfx = this.fx.paintPhosphorSlab(x, y, w, h, seed);
       this.platformGfxList.push(gfx);
     };
 
     const sidewall = (x: number, y: number, w: number, h: number, _color: number, seed: number) => {
       const r = this.add.rectangle(x, y, w, h, 0, 0);
-      this.matter.add.gameObject(r, { isStatic: true, friction: 0, frictionStatic: 0, restitution: 0.3, label: 'sidewall' });
+      // restitution: 0 — we handle the billiard reflection ourselves in collisionstart
+      this.matter.add.gameObject(r, { isStatic: true, friction: 0, frictionStatic: 0, restitution: 0, label: 'sidewall' });
       const gfx = this.fx.paintPhosphorSlab(x, y, w, h, seed);
       this.platformGfxList.push(gfx);
     };
@@ -402,25 +412,45 @@ export class GameScene extends Phaser.Scene {
 
     // ── Aim ───────────────────────────────────────────────────────────────
     if (this.rope.state === 'IDLE') {
-      if (inp.left)  this.aimAngle -= PHYSICS.aim.rotateSpeed * dt;
-      if (inp.right) this.aimAngle += PHYSICS.aim.rotateSpeed * dt;
-      if (!this.input2.isTouchDevice()) {
-        const ptr = this.input.activePointer;
-        if (ptr.worldX !== this.lastMouseX || ptr.worldY !== this.lastMouseY) {
-          this.lastMouseX = ptr.worldX; this.lastMouseY = ptr.worldY;
-          const dx = ptr.worldX - this.player.x, dy = ptr.worldY - this.player.y;
-          if (Math.hypot(dx, dy) > 20) this.aimAngle = Math.atan2(dy, dx);
+      const grounded = this.player.isGrounded(this.time.now);
+      const sliding  = this.player.isSliding();
+
+      if (!sliding) {
+        if (grounded) {
+          // Analog joystick / keyboard rotates the aim arm.
+          if (inp.joyX !== 0) this.aimAngle += inp.joyX * PHYSICS.aim.rotateSpeed * dt;
+          if (!this.input2.isTouchDevice()) {
+            const ptr = this.input.activePointer;
+            if (ptr.worldX !== this.lastMouseX || ptr.worldY !== this.lastMouseY) {
+              this.lastMouseX = ptr.worldX; this.lastMouseY = ptr.worldY;
+              const dx = ptr.worldX - this.player.x, dy = ptr.worldY - this.player.y;
+              if (Math.hypot(dx, dy) > 20) this.aimAngle = Math.atan2(dy, dx);
+            }
+          }
+        } else {
+          // Airborne without rope: aim auto-tracks velocity — 45° upward in
+          // direction of travel (Worms behavior). Player cannot steer the aim.
+          const vx = this.player.body.velocity.x;
+          if (Math.abs(vx) > 0.3) {
+            this.aimAngle = vx > 0 ? -Math.PI / 4 : -(3 * Math.PI) / 4;
+          } else {
+            this.aimAngle = -Math.PI / 2;
+          }
         }
       }
-      inp.aimX = this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
-      inp.aimY = this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
+
+      // Desktop: fire target = angle arm. Mobile: fire target = tap coords set by pointer events.
+      if (!this.input2.isTouchDevice()) {
+        inp.aimX = this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
+        inp.aimY = this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
+      }
     }
 
-    if (inp.firePressed   && this.rope.state === 'IDLE')     this.rope.fireAt(inp.aimX, inp.aimY);
+    if (inp.firePressed   && this.rope.state === 'IDLE' && !this.player.isSliding()) this.rope.fireAt(inp.aimX, inp.aimY);
     if (inp.detachPressed && this.rope.state === 'SWINGING') this.rope.detach(true);
 
-    const playerInput = this.rope.state === 'IDLE'
-      ? { ...inp, left: false, right: false } : inp;
+    const playerInput = this.rope.state === 'SWINGING'
+      ? inp : { ...inp, left: false, right: false };
     this.player.update(playerInput, this.rope.state === 'SWINGING');
     this.rope.update(dt, inp);
 
@@ -450,8 +480,15 @@ export class GameScene extends Phaser.Scene {
 
     // ── Aim guide ─────────────────────────────────────────────────────────
     this.aimGuide.clear();
-    if (this.rope.state === 'IDLE') {
-      this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, inp.aimX, inp.aimY, PHYSICS.rope.maxLength, false);
+    if (this.rope.state === 'IDLE' && !this.player.isSliding()) {
+      // Guide direction: pointer during AIM drag; angle arm otherwise.
+      const gx = this.input2.isTouchDevice() && inp.aiming
+        ? inp.aimX
+        : this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
+      const gy = this.input2.isTouchDevice() && inp.aiming
+        ? inp.aimY
+        : this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
+      this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, gx, gy, PHYSICS.rope.maxLength, inp.aiming);
     }
 
     // ── Trajectory preview ────────────────────────────────────────────────
@@ -487,11 +524,8 @@ export class GameScene extends Phaser.Scene {
     this.heightText.setText(metersLeft > 0 ? `${metersLeft} m` : 'CLIMB!');
     this.heightText.setColor(this.phosphorColor > 0x888800 ? '#ff7a3d' : `#${this.phosphorColor.toString(16).padStart(6, '0')}`);
 
-    const sliding = this.player.isSliding();
-    this.slideText.setVisible(sliding).setAlpha(sliding ? 0.9 : 0);
-
     this.hudText.setText(
-      `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${sliding ? '  SLIDING' : ''}`,
+      `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${this.player.isSliding() ? '  SLIDING' : ''}`,
     );
 
     this.input2.clearOneShots();

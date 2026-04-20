@@ -22,7 +22,7 @@ Spiritual parents: **Jump King** (vertical rage-climber, one life) + **Worms Nin
 |---|---|---|
 | **Portrait-first layout (480×854)** | Mobile-native, Jump King-style vertical scroll | Landscape broke mobile UX entirely |
 | **One run, no respawn** | Core tension. Falling is the punishment. | Adding checkpoints changes the genre |
-| **Rope is the primary locomotion** | Walking is rare. Rope swings carry you up. | Don't over-power ground movement |
+| **Rope is the only locomotion** | No walking at all. Left/right on ground only rotates the aim arm. | Do not re-add ground movement |
 | **Worms-faithful pendulum rope** | Physics drives the swing; gravity is your engine, not arrow keys | Do not add "fly with arrows" air control |
 | **Ink & Ember visuals** | Procedural, no tilesets, artist-free for a jam | Palette lives in `theme.ts` — one edit changes everything |
 | **Single tall world, hand-authored platforms** | Intentional level design (like Jump King), not procedural | Procedural = scope trap in a jam context |
@@ -102,7 +102,7 @@ src/
   entities/
     RopeStateMachine.ts  — pure state machine, NO Phaser deps, fully tested
     Rope.ts              — Phaser adapter: raycasting, constraint, graphics
-    Player.ts            — Matter body + walk/jump/swing
+    Player.ts            — Matter body + swing/slide (no walking)
   scenes/
     BootScene.ts         — title card → GameScene
     GameScene.ts         — owns Matter world, vertical tower arena
@@ -121,8 +121,8 @@ tests/
 ## Controls (Worms-style angle aim — no mouse required)
 
 ### Desktop
-- **A / D or ◄ / ►**: rotate aim arm (when IDLE) / pendulum pump (when SWINGING) / walk (grounded)
-- **Space**: fire rope (IDLE) / detach (SWINGING)
+- **A / D or ◄ / ►**: rotate aim arm (when IDLE **and grounded**) / pendulum pump (when SWINGING) — no walking
+- **Space**: fire rope (IDLE, not sliding) / detach (SWINGING)
 - **W / Up**: reel in
 - **S / Down**: reel out
 - **Right-click**: hard detach
@@ -136,7 +136,7 @@ Mode preference persists in `localStorage` under `harness.touchMode`.
 
 **MODE · TAP** *(default, beginner)*
 - **Tap arena**: fire rope at tap point (or detach if already SWINGING)
-- **◄ ►** (bottom-left): rotate aim (IDLE) / pendulum pump (SWINGING) / walk (grounded)
+- **◄ ►** (bottom-left): rotate aim (IDLE and grounded) / pendulum pump (SWINGING) — no walking
 - **▲** (bottom-right, top): reel in (also fires rope if IDLE)
 - **▼** (bottom-right, bottom): reel out / detach when SWINGING
 
@@ -150,10 +150,12 @@ Mode preference persists in `localStorage` under `harness.touchMode`.
 
 ### Key design decisions on controls
 - Mouse is optional: full game is playable keyboard-only and on mobile without mouse
-- A/D rotates aim, SPACE fires — just like Worms bazooka aiming
+- A/D rotates aim only when **grounded**; while airborne without rope, aim auto-tracks
+  velocity at 45° upward in the direction of travel (Worms behavior — you cannot steer mid-air)
 - `firePressed` does NOT auto-detach when swinging (that breaks the Worms flow).
   GameScene explicitly only reacts to `firePressed` when rope state is `IDLE`.
-- Only `detachPressed` (SPACE, ▼, right-click) detaches the rope
+- `firePressed` is also blocked when `isSliding()` — all controls are locked during slide.
+- Only `detachPressed` (SPACE, ▼, right-click, arena tap while SWINGING) detaches the rope
 - `TouchControls` registers touch zones on `InputController` so tap-to-fire
   ignores taps that land on an on-screen button
 
@@ -161,17 +163,17 @@ Mode preference persists in `localStorage` under `harness.touchMode`.
 
 Any contact with a surface while **not** on the rope, at speed ≥ `PHYSICS.player.slideThreshold`,
 triggers a slide:
-- Player **loses all walk/jump/pump control** until velocity drops below 0.5 px/frame
-- Physics (friction + gravity) decelerate them naturally — no input processed
-- **The rope can still be fired** — that's the intended escape
+- **All controls are disabled** (including rope firing) until velocity drops below 0.5 px/frame
+- Physics (friction + gravity) decelerate the player naturally — no input is processed
+- The aim guide is hidden during slide (can't fire anyway)
 - Visual: player body flashes red-to-charcoal on impact
 
 **Wall hits specifically** (`label: 'sidewall'`) also apply `kickFromWall()` — an outward
 horizontal impulse — so the player can never get wedged against the side walls. After the
 kick, gravity carries them downward to the bottom.
 
-This forces the player to stay on the rope. Ground contact is punishing; only re-firing the
-rope can save the run. Gentle contacts (speed < slideThreshold = 3.5) do not trigger slide.
+This makes falling the total punishment: no escape via rope until fully stopped. Gentle
+contacts (speed < slideThreshold = 3.5) do not trigger slide.
 
 ## Static body labels (GameScene)
 
