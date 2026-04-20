@@ -50,12 +50,14 @@ The rope mechanic is the game. Everything else is decoration.
 
 ### Key physics constants (in `src/config.ts`)
 ```
-frictionAir      = 0.003   // low → swing momentum persists (correct)
+gravityY         = 1.4     // heavy — climbing costs effort, falls are punishing
+frictionAir      = 0.006   // doubled from 0.003 — kills missile effect post-detach
 stiffness        = 1.0     // rigid — Worms rod, not bungee
 damping          = 0.01    // minimal → pendulum lasts
-reelSpeed        = 250     // px/s — fast enough to feel responsive
+reelSpeed        = 200     // px/s — slower reel for heavier feel
 swingPump        = 0.0012  // per-frame nudge force during swing (reduced from 0.003 for deliberate arcs)
-detachImpulse    = 0.010   // kick on detach, with upward bias baked into the vector
+detachImpulse    = 0.006   // reduced kick on detach — no missile launches
+maxLength        = 360     // rope reach (fits 640-wide world)
 aim.rotateSpeed  = 2.6     // rad/s — ~150°/sec sweep when A/D held in IDLE
 slideThreshold   = 3.0     // speed at which hard landing triggers slide punishment
 slideMinDuration = 1200    // ms controls stay locked after a hard landing
@@ -83,13 +85,14 @@ The tested invariants:
 
 ## Layout & orientation
 
-- **Game canvas**: 480 × 854 (portrait 9:16)
-- **World**: 480 wide × ~5000 tall (the tower)
+- **Game canvas**: 480 × 854 (portrait 9:16) — the viewport stays fixed for mobile
+- **World**: 640 wide × 5000 tall (wider than viewport for swing room)
+- **Camera zoom**: 0.75 (GAME_W/WORLD_W) — shows full 640px width, everything appears smaller
 - **Camera**: vertical-biased follow, looks ahead upward
 - **Mobile**: portrait is the primary orientation. No "rotate your device" overlay.
 - **Desktop**: portrait window, centered, scales via `Phaser.Scale.FIT`
 
-Changing dimensions requires updating: `src/config.ts`, `src/main.ts` (scale config),
+Changing dimensions requires updating: `src/config.ts` (WORLD_W, TOWER_H),
 `src/scenes/GameScene.ts` (arena bounds and platform layout).
 
 ---

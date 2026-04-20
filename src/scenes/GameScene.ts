@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { GAME_W, GAME_H, TOWER_H, PHYSICS } from '../config';
+import { GAME_W, GAME_H, WORLD_W, TOWER_H, PHYSICS } from '../config';
 import { THEME } from '../theme';
 import { InputController } from '../systems/InputController';
 import { TouchControls } from '../systems/TouchControls';
@@ -61,9 +61,10 @@ export class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
 
   create(): void {
-    const W = GAME_W, H = TOWER_H;
+    const W = WORLD_W, H = TOWER_H;
 
     this.cameras.main.setBounds(0, 0, W, H);
+    this.cameras.main.setZoom(GAME_W / WORLD_W);
     this.cameras.main.setBackgroundColor(THEME.palette.screenBg);
     this.matter.world.setGravity(0, PHYSICS.gravityY);
     this.matter.world.setBounds(0, -200, W, H + 200);
@@ -106,12 +107,12 @@ export class GameScene extends Phaser.Scene {
     new TouchControls(this, this.input2);
 
     this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
-    this.cameras.main.setFollowOffset(0, GAME_H * 0.15);
+    this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
 
     this.fx.paintScanlines(GAME_W, GAME_H);
     this.fx.paintBottomFog(GAME_W, GAME_H);
 
-    this.ambientDrift  = this.fx.createAmbientDrift(GAME_W);
+    this.ambientDrift  = this.fx.createAmbientDrift(WORLD_W);
     this.ignitionSocket = this.fx.createIgnitionSocket(W / 2, 12);
 
     // Initial vignette
@@ -186,13 +187,13 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0).setDepth(200).setAlpha(0.5);
 
     this.heightText = this.add
-      .text(W / 2, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ff7a3d' })
+      .text(GAME_W / 2, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ff7a3d' })
       .setOrigin(0.5, 0).setScrollFactor(0).setDepth(200);
 
 
 
     const hint = this.add
-      .text(W / 2, GAME_H - 28, 'A/D aim · SPACE fire/detach · W/S reel · ◄► mobile aim',
+      .text(GAME_W / 2, GAME_H - 28, 'A/D aim · SPACE fire/detach · W/S reel · ◄► mobile aim',
         { fontFamily: 'monospace', fontSize: '10px', color: '#3aff6a' })
       .setOrigin(0.5, 1).setAlpha(0.45).setScrollFactor(0).setDepth(200);
     this.tweens.add({ targets: hint, alpha: 0, duration: 900, delay: 12000, onComplete: () => hint.destroy() });
