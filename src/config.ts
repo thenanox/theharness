@@ -27,7 +27,7 @@ export const PHYSICS = {
     frictionAir: 0.003,   // LOW — swing momentum must persist between arcs
     friction: 0,       // all friction handled programmatically for reliable control
     restitution: 0.0,
-    maxSpeed: 15,         // px/frame — MUST be < platform thickness (24) to prevent tunneling
+    maxSpeed: 12,         // px/frame — MUST be < platform thickness (24) to prevent tunneling
     // Speed threshold at collision that triggers the Worms-style slide punishment.
     // Below this: gentle landing, player stays in control.
     // Above this: player loses control until velocity reaches ~0.
@@ -47,8 +47,8 @@ export const PHYSICS = {
     detachImpulse: 0.010, // jump-off kick on detach
     // Horizontal pump force applied per physics step during swing.
     // INTENTIONALLY TINY: gravity is the engine, not arrow keys.
-    // Reduced from 0.003 → 0.0018 to prevent easy 360s; needs 3-4 arcs to build real height.
-    swingPump: 0.0018,
+    // Reduced from 0.003 → 0.0012 for slower, more deliberate pendulum arcs.
+    swingPump: 0.0012,
   },
 
   aim: {

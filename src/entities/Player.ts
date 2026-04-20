@@ -94,11 +94,11 @@ export class Player {
 
       // Worms tumble: convert impact into a horizontal skid scaled by fall
       // speed. Big falls = fast slides that can carry you off platform edges.
+      // No vertical bounce — pure inertia slide only.
       const vx = this.body.velocity.x;
       const sign = Math.abs(vx) > 0.5 ? Math.sign(vx) : this.lastHorizSign;
       const skidSpeed = Math.max(Math.abs(vx), Math.min(impactSpeed * 1.2, 12));
-      const bounce = -Math.min(impactSpeed * 0.25, 3);
-      this.setVelocity(sign * skidSpeed, bounce);
+      this.setVelocity(sign * skidSpeed, 0);
 
       this.scene.tweens.add({
         targets: this.gfx,
