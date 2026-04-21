@@ -48,17 +48,39 @@ The rope mechanic is the game. Everything else is decoration.
 - Low solver iterations (constraint becomes springy)
 - High `frictionAir` (kills swing momentum too fast)
 
-### Key physics constants (in `src/config.ts`)
+### Key physics constants (defaults in `src/config.ts`, runtime in `src/tuning.ts`)
 ```
-frictionAir      = 0.003   // low → swing momentum persists (correct)
-stiffness        = 1.0     // rigid — Worms rod, not bungee
-damping          = 0.01    // minimal → pendulum lasts
-reelSpeed        = 200     // px/s — fast enough to feel responsive
-swingPump        = 0.003   // per-frame nudge force during swing (intentionally tiny)
-detachImpulse    = 0.010   // kick on detach, with upward bias baked into the vector
+gravityY         = 1.2     // heavy — climbing costs effort, falls are punishing
+frictionAir      = 0.004   // kills missile effect post-detach without over-damping swings
+stiffness        = 1.0     // rigid — Worms rod, not bungee (not runtime-tunable)
+damping          = 0.01    // minimal → pendulum lasts (not runtime-tunable)
+reelSpeed        = 220     // px/s — slower reel for heavier feel
+swingPump        = 0.0015  // per-frame nudge force during swing
+detachImpulse    = 0.008   // kick on detach — enough to climb, no missile launches
+maxLength        = 360     // rope reach (fits 640-wide world)
+maxSpeed         = 12      // must be < thinnest wall (24px) to prevent tunneling
 aim.rotateSpeed  = 2.6     // rad/s — ~150°/sec sweep when A/D held in IDLE
+slideThreshold   = 3.0     // speed at which hard landing triggers slide punishment
+slideMinDuration = 1200    // ms controls stay locked after a hard landing
+slideDeceleration= 0.955   // per-frame multiplier on horizontal slide velocity
 ```
 These are hard-won. Don't increase `swingPump` or `frictionAir` without testing.
+
+### Runtime tuning system
+
+All physics values above (except stiffness/damping) are **runtime-tunable**:
+
+- **`src/tuning.ts`** — mutable `TUNING` object initialized from `PHYSICS` defaults.
+  Override via URL params: `?gravityY=1.0&swingPump=0.002`
+- **`src/systems/TuningPanel.ts`** — in-game slider panel (press **\`** to toggle).
+  Has a "Copy URL params" button to share tuning sets.
+- **`GameScene.ts`** reads `TUNING.gravityY` every frame so gravity changes are instant.
+- **`Rope.ts`** passes getter-based config to `RopeStateMachine` so `reelSpeed`,
+  `maxLength`, and `detachImpulse` update live without reconnecting.
+- **`Player.ts`** reads `TUNING.frictionAir`, `TUNING.maxSpeed`, `TUNING.swingPump`,
+  `TUNING.slideThreshold`, and `TUNING.slideMinDuration` every frame.
+- **Tests** (`tests/rope.test.ts`) use their own `BASE_CFG` — completely isolated
+  from `TUNING`. Never break test isolation.
 
 ---
 
@@ -80,13 +102,14 @@ The tested invariants:
 
 ## Layout & orientation
 
-- **Game canvas**: 480 × 854 (portrait 9:16)
-- **World**: 480 wide × ~5000 tall (the tower)
+- **Game canvas**: 480 × 854 (portrait 9:16) — the viewport stays fixed for mobile
+- **World**: 640 wide × 5000 tall (wider than viewport for swing room)
+- **Camera zoom**: 0.75 (GAME_W/WORLD_W) — shows full 640px width, everything appears smaller
 - **Camera**: vertical-biased follow, looks ahead upward
 - **Mobile**: portrait is the primary orientation. No "rotate your device" overlay.
 - **Desktop**: portrait window, centered, scales via `Phaser.Scale.FIT`
 
-Changing dimensions requires updating: `src/config.ts`, `src/main.ts` (scale config),
+Changing dimensions requires updating: `src/config.ts` (WORLD_W, TOWER_H),
 `src/scenes/GameScene.ts` (arena bounds and platform layout).
 
 ---
@@ -95,7 +118,8 @@ Changing dimensions requires updating: `src/config.ts`, `src/main.ts` (scale con
 
 ```
 src/
-  config.ts              — GAME_W/H, PHYSICS constants (rope tuning lives here)
+  config.ts              — GAME_W/H, PHYSICS constants (compile-time defaults)
+  tuning.ts              — mutable TUNING object (runtime overrides, URL params)
   theme.ts               — all colors, strings, narrative labels
   types.ts               — RopeState, shared interfaces
   main.ts                — Phaser game config (portrait scale)
@@ -109,6 +133,7 @@ src/
   systems/
     InputController.ts   — keyboard + touch events → InputState
     TouchControls.ts     — portrait on-screen buttons
+    TuningPanel.ts       — DOM slider panel for live physics tuning (` key)
     VisualFX.ts          — Ink & Ember procedural drawing helpers
     AudioBus.ts          — music start/duck
 

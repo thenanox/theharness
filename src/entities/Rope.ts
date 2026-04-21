@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { PHYSICS } from '../config';
+import { TUNING } from '../tuning';
 import { THEME } from '../theme';
 import { RopeStateMachine } from './RopeStateMachine';
 import type { RopeState } from '../types';
@@ -43,7 +44,14 @@ export class Rope {
     this.player = player;
     this.fx = fx;
 
-    this.sm = new RopeStateMachine(PHYSICS.rope);
+    this.sm = new RopeStateMachine({
+      get stiffness() { return PHYSICS.rope.stiffness; },
+      get damping() { return PHYSICS.rope.damping; },
+      get reelSpeed() { return TUNING.reelSpeed; },
+      get maxLength() { return TUNING.maxLength; },
+      get minLength() { return PHYSICS.rope.minLength; },
+      get detachImpulse() { return TUNING.detachImpulse; },
+    });
 
     this.glowGfx = scene.add.graphics().setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
     this.coreGfx = scene.add.graphics().setDepth(6);
@@ -75,8 +83,8 @@ export class Rope {
 
     const nx = dx / dist;
     const ny = dy / dist;
-    const ex = sx + nx * PHYSICS.rope.maxLength;
-    const ey = sy + ny * PHYSICS.rope.maxLength;
+    const ex = sx + nx * TUNING.maxLength;
+    const ey = sy + ny * TUNING.maxLength;
 
     const hit = this.raycast(sx, sy, ex, ey);
     if (!hit) {

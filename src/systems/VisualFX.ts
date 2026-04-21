@@ -331,17 +331,17 @@ export class VisualFX {
 
   // ── Ambient drift particle system ─────────────────────────────────────────
 
-  createAmbientDrift(viewportW: number): {
+  createAmbientDrift(worldW: number): {
     update(playerY: number, dt: number, phosphorColor: number, allEmber?: boolean): void;
     destroy(): void;
   } {
     interface Dot { x: number; y: number; vx: number; vy: number; size: number; isEmber: boolean; phase: number }
-    const gfx = this.scene.add.graphics().setScrollFactor(0).setDepth(15);
+    const gfx = this.scene.add.graphics().setDepth(15);
     const pool: Dot[] = [];
     for (let i = 0; i < 35; i++) {
       pool.push({
-        x: Math.random() * viewportW,
-        y: Math.random() * 854,
+        x: Math.random() * worldW,
+        y: Math.random() * 1200,
         vx: (Math.random() - 0.5) * 10,
         vy: -(8 + Math.random() * 14),
         size: 0.8 + Math.random() * 1.4,
@@ -349,41 +349,31 @@ export class VisualFX {
         phase: Math.random() * Math.PI * 2,
       });
     }
-    let cameraY = 0;
-    this.scene.cameras.main.on('followupdate', (_cam: Phaser.Cameras.Scene2D.Camera) => {
-      cameraY = _cam.scrollY;
-    });
 
     const update = (playerY: number, dt: number, phosphorColor: number, allEmber = false) => {
-      // get scroll from camera
-      const scrollY = this.scene.cameras.main.scrollY;
-      gfx.clear();
-      const windowH = 854;
-      const wTop = scrollY - 100;
-      const wBot = scrollY + windowH + 100;
+      const cam = this.scene.cameras.main;
+      const visH = cam.height / cam.zoom;
+      const wTop = cam.scrollY - 100;
+      const wBot = cam.scrollY + visH + 100;
 
+      gfx.clear();
       pool.forEach((p) => {
         p.x += (p.vx + Math.sin(p.phase + playerY * 0.002) * 0.4) * dt;
         p.y += p.vy * dt;
         p.phase += dt * 1.2;
-        // Wrap within scroll window
         if (p.y < wTop) {
           p.y = wBot;
-          p.x = Math.random() * viewportW;
+          p.x = Math.random() * worldW;
           p.isEmber = allEmber || (playerY < 1200 && Math.random() < 0.08);
         }
-        if (p.x < 0) p.x = viewportW;
-        if (p.x > viewportW) p.x = 0;
+        if (p.x < 0) p.x = worldW;
+        if (p.x > worldW) p.x = 0;
 
         const alpha = 0.3 + Math.sin(p.phase) * 0.15;
         const color = p.isEmber ? THEME.palette.ember : phosphorColor;
         gfx.fillStyle(color, alpha * 0.55);
-
-        // Convert from world to screen coords
-        const screenY = p.y - scrollY;
-        gfx.fillCircle(p.x, screenY, p.size);
+        gfx.fillCircle(p.x, p.y, p.size);
       });
-      void cameraY;
     };
     return { update, destroy: () => gfx.destroy() };
   }
