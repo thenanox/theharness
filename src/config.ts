@@ -13,51 +13,40 @@ export const WORLD_W = 640;
 // Tall tower: the world is WORLD_W wide and TOWER_H tall.
 export const TOWER_H = 5000;
 
-// Physics tuning — the soul of the rope feel lives here.
-//
-// ROPE INVARIANT: L/R keys are a pendulum PUMP, not free air steering.
-// Gravity drives the swing. The player needs 2-3 full arcs to build height.
+// Physics tuning — defaults for the rope feel.
+// These are the starting values; the live tuning panel (press `) and URL
+// params can override them at runtime via src/tuning.ts.
 //
 // TUNNELING PREVENTION: maxSpeed must be less than the thinnest wall (24px).
 // Platform thickness in GameScene is 24px; side-walls/floor are 32px.
 export const PHYSICS = {
-  gravityY: 1.4,
-  positionIterations: 14,  // high → constraint is stiffer, less tunneling
+  gravityY: 1.2,
+  positionIterations: 14,
   velocityIterations: 10,
   constraintIterations: 6,
 
   player: {
     mass: 1.0,
-    frictionAir: 0.006,   // doubled from 0.003 — kills the missile effect post-detach
-    friction: 0,       // all friction handled programmatically for reliable control
+    frictionAir: 0.004,
+    friction: 0,
     restitution: 0.0,
-    maxSpeed: 12,         // px/frame — MUST be < platform thickness (24) to prevent tunneling
-    // Speed threshold at collision that triggers the Worms-style slide punishment.
-    // Below this: gentle landing, player stays in control.
-    // Above this: player loses control until velocity reaches ~0.
+    maxSpeed: 12,
     slideThreshold: 3.0,
-    // Minimum time (ms) controls stay locked after a hard landing.
-    // Ensures vertical falls (vx≈0 on impact) still have visible punishment.
     slideMinDuration: 1200,
   },
 
   rope: {
-    stiffness: 1.0,       // truly rigid rod (Worms feel); never go below 0.9
-    damping: 0.01,        // minimal — pendulum must persist
-    reelSpeed: 200,       // px/s — slower reel for heavier feel
-    maxLength: 360,       // px — slightly shorter for tighter arcs in the wider world
-    minLength: 24,        // px
-    fireTravelMs: 110,    // hook-animation time ms
-    detachImpulse: 0.006, // reduced kick on detach — no more missile launches
-    // Horizontal pump force applied per physics step during swing.
-    // INTENTIONALLY TINY: gravity is the engine, not arrow keys.
-    // Reduced from 0.003 → 0.0012 for slower, more deliberate pendulum arcs.
-    swingPump: 0.0012,
+    stiffness: 1.0,
+    damping: 0.01,
+    reelSpeed: 220,
+    maxLength: 360,
+    minLength: 24,
+    fireTravelMs: 110,
+    detachImpulse: 0.008,
+    swingPump: 0.0015,
   },
 
   aim: {
-    // Radians per second when A/D held while rope is IDLE.
-    // ~150°/sec — takes ~1.2s to sweep a full 180° arc.
     rotateSpeed: 2.6,
   },
 } as const;

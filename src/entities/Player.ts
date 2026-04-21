@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { PHYSICS } from '../config';
+import { TUNING } from '../tuning';
 import { THEME } from '../theme';
 import type { InputState } from '../systems/InputController';
 
@@ -88,9 +89,9 @@ export class Player {
 
   triggerSlide(impactSpeed: number): void {
     if (this.sliding) return;
-    if (impactSpeed >= PHYSICS.player.slideThreshold) {
+    if (impactSpeed >= TUNING.slideThreshold) {
       this.sliding = true;
-      this.slideExpiresAt = this.scene.time.now + PHYSICS.player.slideMinDuration;
+      this.slideExpiresAt = this.scene.time.now + TUNING.slideMinDuration;
 
       // Worms tumble: convert impact into a horizontal skid scaled by fall
       // speed. Big falls = fast slides that can carry you off platform edges.
@@ -134,26 +135,26 @@ export class Player {
     const now = this.scene.time.now;
     const v = this.body.velocity;
 
+    this.body.frictionAir = TUNING.frictionAir;
+
     if (Math.abs(v.x) > 0.5) this.lastHorizSign = v.x > 0 ? 1 : -1;
 
     if (this.sliding) {
-      // Programmatic slide deceleration — 0.955 gives long punishing skids.
       if (Math.abs(v.x) > 0.05) this.setVelocity(v.x * 0.955, v.y);
       if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.5 && now >= this.slideExpiresAt) {
         this.sliding = false;
       }
     } else {
-      // Gentle floor braking when IDLE and grounded — prevents infinite drift.
       if (!isSwinging && this.isGrounded(now)) this.applyFloorFriction();
 
       if (isSwinging && input.joyX !== 0) {
-        this.applyForce(input.joyX * PHYSICS.rope.swingPump, 0);
+        this.applyForce(input.joyX * TUNING.swingPump, 0);
       }
     }
 
     const speed = Math.hypot(this.body.velocity.x, this.body.velocity.y);
-    if (speed > PHYSICS.player.maxSpeed) {
-      const s = PHYSICS.player.maxSpeed / speed;
+    if (speed > TUNING.maxSpeed) {
+      const s = TUNING.maxSpeed / speed;
       this.setVelocity(this.body.velocity.x * s, this.body.velocity.y * s);
     }
 

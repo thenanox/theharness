@@ -1,8 +1,10 @@
 import * as Phaser from 'phaser';
-import { GAME_W, GAME_H, WORLD_W, TOWER_H, PHYSICS } from '../config';
+import { GAME_W, GAME_H, WORLD_W, TOWER_H } from '../config';
+import { TUNING } from '../tuning';
 import { THEME } from '../theme';
 import { InputController } from '../systems/InputController';
 import { TouchControls } from '../systems/TouchControls';
+import { TuningPanel } from '../systems/TuningPanel';
 import { VisualFX } from '../systems/VisualFX';
 import { AudioBus } from '../systems/AudioBus';
 import { Player } from '../entities/Player';
@@ -66,7 +68,8 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, W, H);
     this.cameras.main.setZoom(GAME_W / WORLD_W);
     this.cameras.main.setBackgroundColor(THEME.palette.screenBg);
-    this.matter.world.setGravity(0, PHYSICS.gravityY);
+    this.matter.world.setGravity(0, TUNING.gravityY);
+    new TuningPanel();
     this.matter.world.setBounds(0, -200, W, H + 200);
 
     this.fx = new VisualFX(this);
@@ -171,7 +174,7 @@ export class GameScene extends Phaser.Scene {
             this.rope.relaxConstraintToFit();
             // Billiard reflection: flip vx, preserve vy (up-left → up-right).
             this.player.reflectOffWall(nx, 0.75);
-            if (speed >= PHYSICS.player.slideThreshold) this.triggerShake(70, 0.004);
+            if (speed >= TUNING.slideThreshold) this.triggerShake(70, 0.004);
             if (this.rope.state !== 'SWINGING') this.player.triggerSlide(speed);
           } else if (this.rope.state !== 'SWINGING') {
             // Platform/floor: slide only when not swinging
@@ -239,24 +242,28 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setAlpha(0.9);
 
     // ── ZONE: START (y ≈ 5000..4200) — "The Foundation" ─────────────────────
-    // Generous ledges teach rope basics. The gateway structure is the landmark.
+    // Extra-wide ledges teach rope basics. Generous gaps for pendulum practice.
 
-    // Loading dock — wide welcoming platform with a raised step
-    slab(W * 0.35, 4850, 190, T, THEME.palette.moss,  301);
-    slab(W * 0.78, 4820,  90, T, THEME.palette.stone, 303);
+    // Loading dock — extra-wide welcoming platform
+    slab(W * 0.38, 4860, 260, T, THEME.palette.moss,  301);
+    // Right practice step — first short swing target
+    slab(W * 0.72, 4780, 130, T, THEME.palette.stone, 303);
+    // Left practice landing — easy back-and-forth
+    slab(W * 0.28, 4680, 160, T, THEME.palette.moss,  305);
+    // Wide central — generous landing zone
+    slab(W * 0.55, 4560, 190, T, THEME.palette.stone, 307);
 
-    // Gateway structure (Π arch) — two pillars + lintel. First visual landmark.
-    slab(W * 0.22, 4720, T,   90,  THEME.palette.stone, 305); // left pillar
-    slab(W * 0.50, 4720, T,   90,  THEME.palette.stone, 307); // right pillar
-    slab(W * 0.36, 4672, 160, T,   THEME.palette.stone, 309); // lintel
+    // Gateway structure (Π arch) — two pillars + wide lintel. First landmark.
+    slab(W * 0.22, 4440, T,   80,  THEME.palette.stone, 309); // left pillar
+    slab(W * 0.48, 4440, T,   80,  THEME.palette.stone, 311); // right pillar
+    slab(W * 0.35, 4398, 190, T,   THEME.palette.stone, 313); // wide lintel
 
     // Wide bridge — generous landing past the gateway
-    slab(W * 0.72, 4540, 140, T, THEME.palette.stone, 311);
+    slab(W * 0.72, 4280, 160, T, THEME.palette.stone, 315);
 
-    // Stepped ascent toward Boiler Hall
-    slab(W * 0.20, 4400, 110, T, THEME.palette.moss,  313);
-    slab(W * 0.65, 4290,  70, T, THEME.palette.stone, 315);
-    slab(W * 0.35, 4210,  55, T, THEME.palette.stone, 317);
+    // Transition toward Boiler Hall
+    slab(W * 0.25, 4180, 120, T, THEME.palette.moss,  317);
+    slab(W * 0.60, 4080,  80, T, THEME.palette.stone, 319);
 
     // ── ZONE: BOILER HALL (y ≈ 4200..3200) — "The Machine Room" ─────────────
     // Two boiler tanks (thick columns capped with maintenance plates) force
@@ -455,6 +462,8 @@ export class GameScene extends Phaser.Scene {
   update(_t: number, deltaMs: number): void {
     const dt = deltaMs / 1000;
 
+    this.matter.world.setGravity(0, TUNING.gravityY);
+
     this.input2.sample();
     const inp = this.input2.state;
 
@@ -472,7 +481,7 @@ export class GameScene extends Phaser.Scene {
       if (!sliding) {
         if (grounded) {
           // Analog joystick / keyboard rotates the aim arm.
-          if (inp.joyX !== 0) this.aimAngle += inp.joyX * PHYSICS.aim.rotateSpeed * dt;
+          if (inp.joyX !== 0) this.aimAngle += inp.joyX * TUNING.aimRotateSpeed * dt;
           if (!this.input2.isTouchDevice()) {
             const ptr = this.input.activePointer;
             if (ptr.worldX !== this.lastMouseX || ptr.worldY !== this.lastMouseY) {
@@ -495,8 +504,8 @@ export class GameScene extends Phaser.Scene {
 
       // Desktop: fire target = angle arm. Mobile: fire target = tap coords set by pointer events.
       if (!this.input2.isTouchDevice()) {
-        inp.aimX = this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
-        inp.aimY = this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
+        inp.aimX = this.player.x + Math.cos(this.aimAngle) * TUNING.maxLength;
+        inp.aimY = this.player.y + Math.sin(this.aimAngle) * TUNING.maxLength;
       }
     }
 
@@ -538,17 +547,17 @@ export class GameScene extends Phaser.Scene {
       // Guide direction: pointer during AIM drag; angle arm otherwise.
       const gx = this.input2.isTouchDevice() && inp.aiming
         ? inp.aimX
-        : this.player.x + Math.cos(this.aimAngle) * PHYSICS.rope.maxLength;
+        : this.player.x + Math.cos(this.aimAngle) * TUNING.maxLength;
       const gy = this.input2.isTouchDevice() && inp.aiming
         ? inp.aimY
-        : this.player.y + Math.sin(this.aimAngle) * PHYSICS.rope.maxLength;
-      this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, gx, gy, PHYSICS.rope.maxLength, inp.aiming);
+        : this.player.y + Math.sin(this.aimAngle) * TUNING.maxLength;
+      this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, gx, gy, TUNING.maxLength, inp.aiming);
     }
 
     // ── Trajectory preview ────────────────────────────────────────────────
     this.trajGuide.clear();
     if (this.rope.state === 'SWINGING') {
-      const v = this.player.body.velocity, g = PHYSICS.gravityY;
+      const v = this.player.body.velocity, g = TUNING.gravityY;
       this.trajGuide.fillStyle(THEME.palette.rope, 0.25);
       for (let i = 1; i <= 8; i++) {
         const t = i * 5;
