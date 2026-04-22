@@ -61,7 +61,7 @@ maxSpeed         = 5       // must be < thinnest wall (24px) to prevent tunnelin
 aim.rotateSpeed  = 5.0     // rad/s — fast aim sweep (mobile joystick fallback)
 slideThreshold   = 1.0     // speed at which surface contact triggers stun
 slideMinDuration = 200     // ms minimum stun time after surface contact
-floorFriction    = 0.82    // per-frame velocity multiplier when grounded (tunable)
+floorFriction    = 0.98    // per-frame velocity multiplier when grounded (tunable)
 ```
 No detachImpulse — player keeps exact velocity on detach (pure momentum conservation).
 
@@ -181,7 +181,7 @@ Any contact with a surface (wall or floor) while **not** on the rope, at speed
   `slideMinDuration` ms have elapsed
 - No artificial velocity injection — natural physics (floor friction, gravity, air
   friction) decelerate the player
-- Floor friction (`TUNING.floorFriction`, default 0.82) applies per-frame when
+- Floor friction (`TUNING.floorFriction`, default 0.98) applies per-frame when
   grounded, both during stun and normal play
 - The aim guide is hidden during stun (can't fire anyway)
 - Visual: player body flashes red-to-phosphor on impact

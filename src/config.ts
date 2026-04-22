@@ -33,7 +33,7 @@ export const PHYSICS = {
     maxSpeed: 5,
     slideThreshold: 1.0,
     slideMinDuration: 200,
-    floorFriction: 0.82,
+    floorFriction: 0.98,
   },
 
   rope: {
