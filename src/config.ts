@@ -20,33 +20,33 @@ export const TOWER_H = 5000;
 // TUNNELING PREVENTION: maxSpeed must be less than the thinnest wall (24px).
 // Platform thickness in GameScene is 24px; side-walls/floor are 32px.
 export const PHYSICS = {
-  gravityY: 1.2,
+  gravityY: 0.50,
   positionIterations: 14,
   velocityIterations: 10,
   constraintIterations: 6,
 
   player: {
     mass: 1.0,
-    frictionAir: 0.004,
+    frictionAir: 0.010,
     friction: 0,
     restitution: 0.0,
-    maxSpeed: 12,
-    slideThreshold: 3.0,
-    slideMinDuration: 1200,
+    maxSpeed: 5,
+    slideThreshold: 1.0,
+    slideMinDuration: 200,
+    floorFriction: 0.82,
   },
 
   rope: {
     stiffness: 1.0,
     damping: 0.01,
-    reelSpeed: 220,
-    maxLength: 360,
+    reelSpeed: 80,
+    maxLength: 200,
     minLength: 24,
     fireTravelMs: 110,
-    detachImpulse: 0.008,
-    swingPump: 0.0015,
+    swingPump: 0.0005,
   },
 
   aim: {
-    rotateSpeed: 2.6,
+    rotateSpeed: 5.0,
   },
 } as const;

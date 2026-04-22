@@ -20,7 +20,6 @@ export class Player {
   private lastVyForLanding  = 0;
   private sliding           = false;
   private slideExpiresAt    = 0;
-  private lastHorizSign     = 1;
   private squashActive      = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -93,14 +92,6 @@ export class Player {
       this.sliding = true;
       this.slideExpiresAt = this.scene.time.now + TUNING.slideMinDuration;
 
-      // Worms tumble: convert impact into a horizontal skid scaled by fall
-      // speed. Big falls = fast slides that can carry you off platform edges.
-      // No vertical bounce — pure inertia slide only.
-      const vx = this.body.velocity.x;
-      const sign = Math.abs(vx) > 0.5 ? Math.sign(vx) : this.lastHorizSign;
-      const skidSpeed = Math.max(Math.abs(vx), Math.min(impactSpeed * 1.2, 12));
-      this.setVelocity(sign * skidSpeed, 0);
-
       this.scene.tweens.add({
         targets: this.gfx,
         fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
@@ -128,19 +119,16 @@ export class Player {
 
   applyFloorFriction(): void {
     const vx = this.body.velocity.x;
-    if (Math.abs(vx) > 0.05) this.setVelocity(vx * 0.82, this.body.velocity.y);
+    if (Math.abs(vx) > 0.05) this.setVelocity(vx * TUNING.floorFriction, this.body.velocity.y);
   }
 
   update(input: InputState, isSwinging: boolean): void {
     const now = this.scene.time.now;
-    const v = this.body.velocity;
 
     this.body.frictionAir = TUNING.frictionAir;
 
-    if (Math.abs(v.x) > 0.5) this.lastHorizSign = v.x > 0 ? 1 : -1;
-
     if (this.sliding) {
-      if (Math.abs(v.x) > 0.05) this.setVelocity(v.x * 0.955, v.y);
+      if (this.isGrounded(now)) this.applyFloorFriction();
       if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.5 && now >= this.slideExpiresAt) {
         this.sliding = false;
       }

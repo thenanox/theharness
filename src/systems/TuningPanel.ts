@@ -9,16 +9,16 @@ interface Def {
 }
 
 const DEFS: Def[] = [
-  { key: 'gravityY',         label: 'Gravity',        min: 0.4, max: 2.5,   step: 0.05  },
-  { key: 'frictionAir',      label: 'Air friction',   min: 0.001, max: 0.020, step: 0.001 },
-  { key: 'swingPump',        label: 'Swing pump',     min: 0.0005, max: 0.006, step: 0.0001 },
-  { key: 'detachImpulse',    label: 'Detach impulse', min: 0.002, max: 0.025, step: 0.001  },
-  { key: 'reelSpeed',        label: 'Reel speed',     min: 80,  max: 500,   step: 10    },
-  { key: 'maxLength',        label: 'Rope max',       min: 150, max: 500,   step: 10    },
-  { key: 'maxSpeed',         label: 'Max speed',      min: 4,   max: 25,    step: 1     },
-  { key: 'slideThreshold',   label: 'Slide thresh',   min: 1,   max: 8,     step: 0.5   },
-  { key: 'slideMinDuration', label: 'Slide ms',       min: 200, max: 3000,  step: 100   },
-  { key: 'aimRotateSpeed',   label: 'Aim speed',      min: 0.5, max: 5,     step: 0.1   },
+  { key: 'gravityY',         label: 'Gravity',        min: 0.1, max: 2.5,   step: 0.05  },
+  { key: 'frictionAir',      label: 'Air friction',   min: 0.001, max: 0.030, step: 0.001 },
+  { key: 'swingPump',        label: 'Swing pump',     min: 0.0001, max: 0.006, step: 0.0001 },
+  { key: 'reelSpeed',        label: 'Reel speed',     min: 20,  max: 500,   step: 10    },
+  { key: 'maxLength',        label: 'Rope max',       min: 80,  max: 500,   step: 10    },
+  { key: 'maxSpeed',         label: 'Max speed',      min: 2,   max: 25,    step: 1     },
+  { key: 'floorFriction',    label: 'Floor friction', min: 0.50, max: 0.99,  step: 0.01  },
+  { key: 'slideThreshold',   label: 'Stun thresh',    min: 0.5, max: 8,     step: 0.5   },
+  { key: 'slideMinDuration', label: 'Stun ms',        min: 0,   max: 3000,  step: 50    },
+  { key: 'aimRotateSpeed',   label: 'Aim speed',      min: 0.5, max: 8,     step: 0.1   },
 ];
 
 function fmt(val: number, step: number): string {

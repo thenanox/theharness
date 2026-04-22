@@ -56,9 +56,6 @@ export class GameScene extends Phaser.Scene {
   // Win state
   private winTriggered = false;
 
-  private aimAngle = -Math.PI / 2 + 0.3;
-  private lastMouseX = -1;
-  private lastMouseY = -1;
 
   constructor() { super('Game'); }
 
@@ -196,7 +193,7 @@ export class GameScene extends Phaser.Scene {
 
 
     const hint = this.add
-      .text(GAME_W / 2, GAME_H - 28, 'A/D aim · SPACE fire/detach · W/S reel · ◄► mobile aim',
+      .text(GAME_W / 2, GAME_H - 28, 'Click to fire · SPACE fire/detach · W/S reel · tap to fire on mobile',
         { fontFamily: 'monospace', fontSize: '10px', color: '#3aff6a' })
       .setOrigin(0.5, 1).setAlpha(0.45).setScrollFactor(0).setDepth(200);
     this.tweens.add({ targets: hint, alpha: 0, duration: 900, delay: 12000, onComplete: () => hint.destroy() });
@@ -473,44 +470,11 @@ export class GameScene extends Phaser.Scene {
     // Win check
     if (this.player.y <= 32 && !this.winTriggered) this.playWinSequence();
 
-    // ── Aim ───────────────────────────────────────────────────────────────
-    if (this.rope.state === 'IDLE') {
-      const grounded = this.player.isGrounded(this.time.now);
-      const sliding  = this.player.isSliding();
-
-      if (!sliding) {
-        if (grounded) {
-          // Analog joystick / keyboard rotates the aim arm.
-          if (inp.joyX !== 0) this.aimAngle += inp.joyX * TUNING.aimRotateSpeed * dt;
-          if (!this.input2.isTouchDevice()) {
-            const ptr = this.input.activePointer;
-            if (ptr.worldX !== this.lastMouseX || ptr.worldY !== this.lastMouseY) {
-              this.lastMouseX = ptr.worldX; this.lastMouseY = ptr.worldY;
-              const dx = ptr.worldX - this.player.x, dy = ptr.worldY - this.player.y;
-              if (Math.hypot(dx, dy) > 20) this.aimAngle = Math.atan2(dy, dx);
-            }
-          }
-        } else {
-          // Airborne without rope: aim auto-tracks velocity — 45° upward in
-          // direction of travel (Worms behavior). Player cannot steer the aim.
-          const vx = this.player.body.velocity.x;
-          if (Math.abs(vx) > 0.3) {
-            this.aimAngle = vx > 0 ? -Math.PI / 4 : -(3 * Math.PI) / 4;
-          } else {
-            this.aimAngle = -Math.PI / 2;
-          }
-        }
-      }
-
-      // Desktop: fire target = angle arm. Mobile: fire target = tap coords set by pointer events.
-      if (!this.input2.isTouchDevice()) {
-        inp.aimX = this.player.x + Math.cos(this.aimAngle) * TUNING.maxLength;
-        inp.aimY = this.player.y + Math.sin(this.aimAngle) * TUNING.maxLength;
-      }
-    }
-
+    // ── Fire / Detach ──────────────────────────────────────────────────
+    // Desktop: aim is always the mouse position (set by InputController.sample).
+    // Mobile: aim is the touch position (set by pointerdown/move/up events).
     if (inp.firePressed   && this.rope.state === 'IDLE' && !this.player.isSliding()) this.rope.fireAt(inp.aimX, inp.aimY);
-    if (inp.detachPressed && this.rope.state === 'SWINGING') this.rope.detach(true);
+    if (inp.detachPressed && this.rope.state === 'SWINGING') this.rope.detach();
 
     const playerInput = this.rope.state === 'SWINGING'
       ? inp : { ...inp, left: false, right: false };
@@ -544,14 +508,12 @@ export class GameScene extends Phaser.Scene {
     // ── Aim guide ─────────────────────────────────────────────────────────
     this.aimGuide.clear();
     if (this.rope.state === 'IDLE' && !this.player.isSliding()) {
-      // Guide direction: pointer during AIM drag; angle arm otherwise.
-      const gx = this.input2.isTouchDevice() && inp.aiming
-        ? inp.aimX
-        : this.player.x + Math.cos(this.aimAngle) * TUNING.maxLength;
-      const gy = this.input2.isTouchDevice() && inp.aiming
-        ? inp.aimY
-        : this.player.y + Math.sin(this.aimAngle) * TUNING.maxLength;
-      this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, gx, gy, TUNING.maxLength, inp.aiming);
+      // Desktop: always show (mouse is always present).
+      // Mobile: only show while finger is on screen (inp.aiming).
+      const showGuide = !this.input2.isTouchDevice() || inp.aiming;
+      if (showGuide) {
+        this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, inp.aimX, inp.aimY, TUNING.maxLength, inp.aiming);
+      }
     }
 
     // ── Trajectory preview ────────────────────────────────────────────────

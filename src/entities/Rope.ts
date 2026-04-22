@@ -50,7 +50,6 @@ export class Rope {
       get reelSpeed() { return TUNING.reelSpeed; },
       get maxLength() { return TUNING.maxLength; },
       get minLength() { return PHYSICS.rope.minLength; },
-      get detachImpulse() { return TUNING.detachImpulse; },
     });
 
     this.glowGfx = scene.add.graphics().setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
@@ -72,7 +71,7 @@ export class Rope {
 
   fireAt(targetX: number, targetY: number): void {
     // Clean up any existing rope before starting a new one.
-    this.detach(false);
+    this.detach();
 
     const sx = this.player.x;
     const sy = this.player.y;
@@ -131,9 +130,11 @@ export class Rope {
     ) as unknown as MatterConstraint;
   }
 
-  detach(withImpulse: boolean): void {
+  detach(): void {
     if (this.fireTween?.isPlaying()) this.fireTween.stop();
     this.fireTween = undefined;
+
+    const wasSwinging = this.sm.state === 'SWINGING';
 
     if (this.constraint) {
       const world = (this.scene.matter.world as unknown as {
@@ -143,14 +144,10 @@ export class Rope {
       this.constraint = undefined;
     }
 
-    if (withImpulse) {
-      const impulse = this.sm.calcDetachImpulse({ x: this.player.x, y: this.player.y });
-      if (impulse) {
-        this.applyForce(impulse.x, impulse.y);
-        this.fx?.emberFlicker(this.player.x, this.player.y);
-        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(6);
-        this.scene.events.emit('rope-detach');
-      }
+    if (wasSwinging) {
+      this.fx?.emberFlicker(this.player.x, this.player.y);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(6);
+      this.scene.events.emit('rope-detach');
     }
 
     this.hookGfx.setVisible(false);
@@ -254,9 +251,4 @@ export class Rope {
     return null;
   }
 
-  private applyForce(fx: number, fy: number): void {
-    (this.scene.matter as unknown as {
-      body: { applyForce: (b: MatterBody, p: { x: number; y: number }, f: { x: number; y: number }) => void };
-    }).body.applyForce(this.player.body, this.player.body.position, { x: fx, y: fy });
-  }
 }
