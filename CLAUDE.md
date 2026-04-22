@@ -58,7 +58,6 @@ reelSpeed        = 80      // px/s — deliberate rope control
 swingPump        = 0.0005  // per-frame nudge force during swing — timing matters
 maxLength        = 200     // rope reach — shorter for tighter arcs
 maxSpeed         = 5       // must be < thinnest wall (24px) to prevent tunneling
-aim.rotateSpeed  = 5.0     // rad/s — fast aim sweep (mobile joystick fallback)
 slideThreshold   = 1.0     // speed at which surface contact triggers stun
 slideMinDuration = 200     // ms minimum stun time after surface contact
 floorFriction    = 0.98    // per-frame velocity multiplier when grounded (tunable)

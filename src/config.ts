@@ -23,7 +23,7 @@ export const PHYSICS = {
   gravityY: 0.50,
   positionIterations: 14,
   velocityIterations: 10,
-  constraintIterations: 6,
+  constraintIterations: 10,
 
   player: {
     mass: 1.0,
@@ -46,7 +46,4 @@ export const PHYSICS = {
     swingPump: 0.0005,
   },
 
-  aim: {
-    rotateSpeed: 5.0,
-  },
 } as const;

@@ -15,10 +15,9 @@ const DEFS: Def[] = [
   { key: 'reelSpeed',        label: 'Reel speed',     min: 20,  max: 500,   step: 10    },
   { key: 'maxLength',        label: 'Rope max',       min: 80,  max: 500,   step: 10    },
   { key: 'maxSpeed',         label: 'Max speed',      min: 2,   max: 25,    step: 1     },
-  { key: 'floorFriction',    label: 'Floor friction', min: 0.50, max: 0.99,  step: 0.01  },
+  { key: 'floorFriction',    label: 'Floor friction', min: 0.50, max: 1.00,  step: 0.01  },
   { key: 'slideThreshold',   label: 'Stun thresh',    min: 0.5, max: 8,     step: 0.5   },
   { key: 'slideMinDuration', label: 'Stun ms',        min: 0,   max: 3000,  step: 50    },
-  { key: 'aimRotateSpeed',   label: 'Aim speed',      min: 0.5, max: 8,     step: 0.1   },
 ];
 
 function fmt(val: number, step: number): string {

@@ -13,7 +13,6 @@ export const TUNING: {
   reelSpeed: number;
   maxLength: number;
   swingPump: number;
-  aimRotateSpeed: number;
 } = {
   gravityY: PHYSICS.gravityY,
   frictionAir: PHYSICS.player.frictionAir,
@@ -24,7 +23,6 @@ export const TUNING: {
   reelSpeed: PHYSICS.rope.reelSpeed,
   maxLength: PHYSICS.rope.maxLength,
   swingPump: PHYSICS.rope.swingPump,
-  aimRotateSpeed: PHYSICS.aim.rotateSpeed,
 };
 
 try {

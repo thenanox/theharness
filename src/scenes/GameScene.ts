@@ -120,6 +120,41 @@ export class GameScene extends Phaser.Scene {
     // Initial vignette
     this.fx.paintZoneVignette(this.vignetteGfx, GAME_W, GAME_H, this.phosphorColor, 1.0);
 
+    // ── Per-step velocity cap + hard sidewall clamp ───────────────────────
+    // The rope constraint (stiffness 1.0) can apply position corrections
+    // that create implicit velocity exceeding maxSpeed. Capping after every
+    // Matter step (not just once per frame in Player.update) prevents the
+    // next step from tunneling through geometry.
+    const mBody = (this.matter as unknown as {
+      body: {
+        setVelocity: (b: MatterJS.BodyType, v: { x: number; y: number }) => void;
+        setPosition: (b: MatterJS.BodyType, p: { x: number; y: number }) => void;
+      };
+    }).body;
+
+    this.matter.world.on('afterupdate', () => {
+      const body = this.player.body;
+      const v = body.velocity;
+      const speed = Math.hypot(v.x, v.y);
+      if (speed > TUNING.maxSpeed) {
+        const s = TUNING.maxSpeed / speed;
+        mBody.setVelocity(body, { x: v.x * s, y: v.y * s });
+      }
+
+      // Hard clamp: player center must stay inside sidewalls.
+      // Left wall spans x 0–32, right wall x (W-32)–W. Player half-width = 10.
+      const pos = body.position;
+      const minX = 42;
+      const maxX = W - 42;
+      if (pos.x < minX) {
+        mBody.setPosition(body, { x: minX, y: pos.y });
+        if (body.velocity.x < 0) mBody.setVelocity(body, { x: 0, y: body.velocity.y });
+      } else if (pos.x > maxX) {
+        mBody.setPosition(body, { x: maxX, y: pos.y });
+        if (body.velocity.x > 0) mBody.setVelocity(body, { x: 0, y: body.velocity.y });
+      }
+    });
+
     // ── Collision: sustained contact ─────────────────────────────────────
     this.matter.world.on(
       'collisionactive',
