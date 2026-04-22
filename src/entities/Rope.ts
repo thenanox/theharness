@@ -33,8 +33,6 @@ export class Rope {
   private sm: RopeStateMachine;
 
   private constraint?: MatterConstraint;
-  private lastDetachAt = 0;
-  private static readonly FIRE_COOLDOWN_MS = 150;
 
   private glowGfx: Phaser.GameObjects.Graphics;
   private coreGfx: Phaser.GameObjects.Graphics;
@@ -72,7 +70,6 @@ export class Rope {
   }
 
   fireAt(targetX: number, targetY: number): void {
-    if (this.scene.time.now - this.lastDetachAt < Rope.FIRE_COOLDOWN_MS) return;
     // Clean up any existing rope before starting a new one.
     this.detach();
 
@@ -154,7 +151,6 @@ export class Rope {
     }
 
     this.hookGfx.setVisible(false);
-    if (wasSwinging) this.lastDetachAt = this.scene.time.now;
     this.sm.detach();
   }
 

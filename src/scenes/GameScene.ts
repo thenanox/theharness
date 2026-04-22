@@ -56,6 +56,8 @@ export class GameScene extends Phaser.Scene {
   // Win state
   private winTriggered = false;
 
+  // After detach, block fire until all fire/detach inputs are fully released.
+  private awaitingFireRelease = false;
 
   constructor() { super('Game'); }
 
@@ -470,11 +472,19 @@ export class GameScene extends Phaser.Scene {
     // Win check
     if (this.player.y <= 32 && !this.winTriggered) this.playWinSequence();
 
-    // ── Fire / Detach ──────────────────────────────────────────────────
-    // Desktop: aim is always the mouse position (set by InputController.sample).
-    // Mobile: aim is the touch position (set by pointerdown/move/up events).
-    if (inp.firePressed   && this.rope.state === 'IDLE' && !this.player.isSliding()) this.rope.fireAt(inp.aimX, inp.aimY);
-    if (inp.detachPressed && this.rope.state === 'SWINGING') this.rope.detach();
+    // ── Detach / Fire ──────────────────────────────────────────────────
+    // Detach is processed first. After a detach, fire is blocked until all
+    // fire/detach inputs are fully released to prevent accidental re-fire.
+    if (inp.detachPressed && this.rope.state === 'SWINGING') {
+      this.rope.detach();
+      this.awaitingFireRelease = true;
+    }
+
+    if (this.awaitingFireRelease) {
+      if (!this.input2.isAnyFireInputActive()) this.awaitingFireRelease = false;
+    } else if (inp.firePressed && this.rope.state === 'IDLE' && !this.player.isSliding()) {
+      this.rope.fireAt(inp.aimX, inp.aimY);
+    }
 
     const playerInput = this.rope.state === 'SWINGING'
       ? inp : { ...inp, left: false, right: false };

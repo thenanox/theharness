@@ -177,6 +177,13 @@ export class InputController {
     this.touchZones.push({ x, y, w, h });
   }
 
+  /** True when any fire/detach input is physically held (mouse, Space, touch). */
+  isAnyFireInputActive(): boolean {
+    return this.keys.SPACE.isDown ||
+      this.scene.input.activePointer.isDown ||
+      this.dragPointerId !== null;
+  }
+
   isTouchDevice(): boolean {
     return (
       this.scene.sys.game.device.input.touch ||
