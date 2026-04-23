@@ -59,6 +59,10 @@ export class GameScene extends Phaser.Scene {
   // After detach, block fire until all fire/detach inputs are fully released.
   private awaitingFireRelease = false;
 
+  // Debug free-cam (toggled with ` alongside the tuning panel)
+  private debugCam = false;
+  private debugCamKeys!: Phaser.Types.Input.Keyboard.CursorKeys;
+
   constructor() { super('Game'); }
 
   create(): void {
@@ -110,6 +114,24 @@ export class GameScene extends Phaser.Scene {
 
     this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
     this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
+
+    // Debug free-cam: ` toggles; arrow keys scroll; physics pauses.
+    this.debugCamKeys = this.input.keyboard!.createCursorKeys();
+    const matterEngine = (this.matter.world as unknown as {
+      engine: { timing: { timeScale: number } };
+    }).engine;
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== '`') return;
+      this.debugCam = !this.debugCam;
+      if (this.debugCam) {
+        this.cameras.main.stopFollow();
+        matterEngine.timing.timeScale = 0;
+      } else {
+        this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
+        this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
+        matterEngine.timing.timeScale = 1;
+      }
+    });
 
     this.fx.paintScanlines(GAME_W, GAME_H);
     this.fx.paintBottomFog(GAME_W, GAME_H);
@@ -282,29 +304,23 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setAlpha(0.9);
 
     // ── ZONE: START (y ≈ 5000..4200) — "The Foundation" ─────────────────────
-    // Pure tutorial staircase. Near wall-to-wall platforms, tiny vertical
-    // gaps (60-80px). Each step teaches one swing. Can't-miss landings.
+    // Tutorial staircase: 140-160px gaps give real pendulum room, wide
+    // platforms (350-240px) make landings forgiving. Alternates sides so
+    // each step teaches firing left vs right. Rope can always reach the
+    // next platform directly (offsets kept within maxLength=200).
 
-    // Step 1 — almost wall-to-wall, just fire straight up + reel
-    slab(W * 0.50, 4900, 480, T, THEME.palette.moss,  301);
-    // Step 2 — right side, first real swing target
-    slab(W * 0.62, 4830, 380, T, THEME.palette.stone, 302);
-    // Step 3 — left side, learn to swing the other way
-    slab(W * 0.38, 4760, 380, T, THEME.palette.moss,  303);
-    // Step 4 — center, gentle catch
-    slab(W * 0.50, 4690, 340, T, THEME.palette.stone, 304);
+    // Step 1 — wide center, just fire up + reel
+    slab(W * 0.50, 4820, 360, T, THEME.palette.moss,  301);
+    // Step 2 — lean right, learn rightward swing
+    slab(W * 0.58, 4670, 320, T, THEME.palette.stone, 302);
+    // Step 3 — lean left, learn leftward swing
+    slab(W * 0.42, 4520, 300, T, THEME.palette.moss,  303);
+    // Step 4 — center, introduce detach timing
+    slab(W * 0.52, 4370, 280, T, THEME.palette.stone, 304);
     // Step 5 — right, slightly narrower
-    slab(W * 0.60, 4610, 300, T, THEME.palette.moss,  305);
-    // Step 6 — left
-    slab(W * 0.40, 4530, 300, T, THEME.palette.stone, 306);
-    // Step 7 — center, first hint of challenge
-    slab(W * 0.50, 4440, 260, T, THEME.palette.moss,  307);
-    // Step 8 — right, gateway region
-    slab(W * 0.62, 4350, 240, T, THEME.palette.stone, 308);
-    // Step 9 — left
-    slab(W * 0.38, 4260, 220, T, THEME.palette.moss,  309);
-    // Step 10 — transition into Boiler Hall
-    slab(W * 0.50, 4170, 200, T, THEME.palette.stone, 310);
+    slab(W * 0.60, 4225, 260, T, THEME.palette.moss,  305);
+    // Step 6 — left, transition into Boiler Hall
+    slab(W * 0.42, 4090, 240, T, THEME.palette.stone, 306);
 
     // ── ZONE: BOILER HALL (y ≈ 4200..3200) — "The Machine Room" ─────────────
     // Step up from tutorial. Still wide platforms but tighter gaps (80-100px).
@@ -422,7 +438,7 @@ export class GameScene extends Phaser.Scene {
     for (let y = 200; y < H; y += 320) this.fx.paintRivetRow(W * 0.5, y, W - 48, 2000 + y);
 
     // Pipe runs connecting structural landmarks
-    this.fx.paintPipeRun(W * 0.38, 4170, W * 0.38, 4060, 3002); // Start exit → Boiler tank
+    this.fx.paintPipeRun(W * 0.42, 4090, W * 0.38, 4060, 3002); // Start exit → Boiler tank
     this.fx.paintPipeRun(W * 0.12, 3900, W * 0.38, 3975, 3003); // Left catwalk → boiler cap
     this.fx.paintPipeRun(W * 0.85, 4070, W * 0.55, 3810, 3004); // Right catwalk → steam bridge
     this.fx.paintPipeRun(W * 0.25, 3100, W * 0.75, 3050, 3005); // Gauge columns bridge
@@ -505,6 +521,18 @@ export class GameScene extends Phaser.Scene {
 
   update(_t: number, deltaMs: number): void {
     const dt = deltaMs / 1000;
+
+    // Debug free-cam: arrow keys scroll vertically through the level.
+    if (this.debugCam) {
+      const spd = 1200 * dt;
+      if (this.debugCamKeys.up.isDown)   this.cameras.main.scrollY -= spd;
+      if (this.debugCamKeys.down.isDown) this.cameras.main.scrollY += spd;
+      this.cameras.main.scrollY = Phaser.Math.Clamp(
+        this.cameras.main.scrollY, 0, TOWER_H - GAME_H,
+      );
+      this.hudText.setText(`[DEBUG CAM]  y=${Math.round(this.cameras.main.scrollY)}`);
+      return;
+    }
 
     this.matter.world.setGravity(0, TUNING.gravityY);
 
