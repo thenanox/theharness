@@ -43,6 +43,15 @@ export const THEME = {
     phosphorWarm: 0xffe060, // amber — Gauge Shafts
     phosphorHot: 0xfff5c0,  // near-white — Core (about to reignite)
 
+    // --- parallax layer tints (per-zone accents for background decor) ---
+    // Each biome has a dominant hue that the parallax painters sample when
+    // drawing zone-aligned props (boilers, gauges, flames, capacitors).
+    zoneStart:    0x2a5a38,  // muted green — dead machine
+    zoneBoiler:   0x3a5a2e,  // oxidized green → lime
+    zoneGauge:    0x6a5a18,  // brass / amber
+    zoneIgnition: 0x7a3818,  // rusted ember
+    zoneCore:     0x8a5a18,  // hot brass — almost gold
+
     // --- tiles (grayscale + one sage accent) ---
     stone: 0x2a2b32,        // default ink slab
     ice: 0x5d7684,          // cool-grey with a hint of blue
