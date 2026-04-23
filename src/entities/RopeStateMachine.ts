@@ -21,7 +21,6 @@ export interface RopeConfig {
   reelSpeed: number;   // px/s
   maxLength: number;   // px
   minLength: number;   // px
-  detachImpulse: number;
 }
 
 /** A body with a world position — minimal interface so tests can use plain objects. */
@@ -115,28 +114,4 @@ export class RopeStateMachine {
     };
   }
 
-  /**
-   * Calculate the detach impulse force vector.
-   *
-   * Direction: away from anchor along the rope direction, with an upward bias
-   * so releasing at the top of a swing arc flings the player upward.
-   *
-   * Returns null when not in SWINGING state (caller should not apply force).
-   */
-  calcDetachImpulse(playerPos: Vec2): Vec2 | null {
-    if (this.state !== 'SWINGING') return null;
-    const aw = this.anchorWorld();
-    if (!aw) return null;
-
-    const dx = playerPos.x - aw.x;
-    const dy = playerPos.y - aw.y;
-    const d = Math.hypot(dx, dy) || 1;
-
-    const k = this.cfg.detachImpulse;
-    return {
-      x: (dx / d) * k,
-      // Outward radial component minus an upward kick so apex releases go up.
-      y: (dy / d) * k - k * 0.5,
-    };
-  }
 }

@@ -9,22 +9,20 @@ export const TUNING: {
   maxSpeed: number;
   slideThreshold: number;
   slideMinDuration: number;
+  floorFriction: number;
   reelSpeed: number;
   maxLength: number;
-  detachImpulse: number;
   swingPump: number;
-  aimRotateSpeed: number;
 } = {
   gravityY: PHYSICS.gravityY,
   frictionAir: PHYSICS.player.frictionAir,
   maxSpeed: PHYSICS.player.maxSpeed,
   slideThreshold: PHYSICS.player.slideThreshold,
   slideMinDuration: PHYSICS.player.slideMinDuration,
+  floorFriction: PHYSICS.player.floorFriction,
   reelSpeed: PHYSICS.rope.reelSpeed,
   maxLength: PHYSICS.rope.maxLength,
-  detachImpulse: PHYSICS.rope.detachImpulse,
   swingPump: PHYSICS.rope.swingPump,
-  aimRotateSpeed: PHYSICS.aim.rotateSpeed,
 };
 
 try {

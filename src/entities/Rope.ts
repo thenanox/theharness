@@ -50,7 +50,6 @@ export class Rope {
       get reelSpeed() { return TUNING.reelSpeed; },
       get maxLength() { return TUNING.maxLength; },
       get minLength() { return PHYSICS.rope.minLength; },
-      get detachImpulse() { return TUNING.detachImpulse; },
     });
 
     this.glowGfx = scene.add.graphics().setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
@@ -71,8 +70,7 @@ export class Rope {
   }
 
   fireAt(targetX: number, targetY: number): void {
-    // Clean up any existing rope before starting a new one.
-    this.detach(false);
+    this.detach();
 
     const sx = this.player.x;
     const sy = this.player.y;
@@ -87,21 +85,36 @@ export class Rope {
     const ey = sy + ny * TUNING.maxLength;
 
     const hit = this.raycast(sx, sy, ex, ey);
-    if (!hit) {
-      this.flashMiss(sx, sy, ex, ey);
-      return;
-    }
+    const tx = hit ? hit.point.x : ex;
+    const ty = hit ? hit.point.y : ey;
 
     this.sm.startFire();
     this.hookGfx.setPosition(sx, sy).setVisible(true);
     this.fireTween?.stop();
     this.fireTween = this.scene.tweens.add({
       targets: this.hookGfx,
-      x: hit.point.x,
-      y: hit.point.y,
+      x: tx,
+      y: ty,
       duration: PHYSICS.rope.fireTravelMs,
       ease: 'Cubic.easeOut',
-      onComplete: () => this.attach(hit),
+      onComplete: () => {
+        if (hit) {
+          this.attach(hit);
+        } else {
+          this.flashRicochet(tx, ty, nx, ny);
+          this.fireTween = this.scene.tweens.add({
+            targets: this.hookGfx,
+            x: this.player.x,
+            y: this.player.y,
+            duration: PHYSICS.rope.fireTravelMs * 0.7,
+            ease: 'Cubic.easeIn',
+            onComplete: () => {
+              this.hookGfx.setVisible(false);
+              this.sm.detach();
+            },
+          });
+        }
+      },
     });
   }
 
@@ -131,9 +144,11 @@ export class Rope {
     ) as unknown as MatterConstraint;
   }
 
-  detach(withImpulse: boolean): void {
+  detach(): void {
     if (this.fireTween?.isPlaying()) this.fireTween.stop();
     this.fireTween = undefined;
+
+    const wasSwinging = this.sm.state === 'SWINGING';
 
     if (this.constraint) {
       const world = (this.scene.matter.world as unknown as {
@@ -143,14 +158,10 @@ export class Rope {
       this.constraint = undefined;
     }
 
-    if (withImpulse) {
-      const impulse = this.sm.calcDetachImpulse({ x: this.player.x, y: this.player.y });
-      if (impulse) {
-        this.applyForce(impulse.x, impulse.y);
-        this.fx?.emberFlicker(this.player.x, this.player.y);
-        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(6);
-        this.scene.events.emit('rope-detach');
-      }
+    if (wasSwinging) {
+      this.fx?.emberFlicker(this.player.x, this.player.y);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(6);
+      this.scene.events.emit('rope-detach');
     }
 
     this.hookGfx.setVisible(false);
@@ -215,14 +226,9 @@ export class Rope {
     }
   }
 
-  private flashMiss(sx: number, sy: number, ex: number, ey: number): void {
+  private flashRicochet(ex: number, ey: number, nx: number, ny: number): void {
     const g = this.scene.add.graphics().setDepth(5);
-    g.lineStyle(1, THEME.palette.phosphorBase, 0.4);
-    g.lineBetween(sx, sy, ex, ey);
-    // Perpendicular tick marks at the endpoint (missed hook ricochet)
-    const dx = ex - sx, dy = ey - sy;
-    const len = Math.hypot(dx, dy) || 1;
-    const px = -dy / len, py = dx / len; // perpendicular
+    const px = -ny, py = nx;
     g.lineStyle(1, THEME.palette.phosphorBase, 0.55);
     for (let i = -1; i <= 1; i++) {
       const ox = ex + px * i * 5, oy = ey + py * i * 5;
@@ -254,9 +260,4 @@ export class Rope {
     return null;
   }
 
-  private applyForce(fx: number, fy: number): void {
-    (this.scene.matter as unknown as {
-      body: { applyForce: (b: MatterBody, p: { x: number; y: number }, f: { x: number; y: number }) => void };
-    }).body.applyForce(this.player.body, this.player.body.position, { x: fx, y: fy });
-  }
 }

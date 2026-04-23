@@ -4,17 +4,10 @@ import * as Phaser from 'phaser';
  * Frame-stable input snapshot. Consumers read the `state` each update;
  * the controller clears one-shot flags (pressed/released) after reads.
  *
- * Mobile supports two control modes:
- *   - 'tap' : a single tap fires the rope at the tap point. Ultra-easy.
- *   - 'aim' : hold (>= HOLD_AIM_MS) to reveal an aim preview, drag to
- *             tune, release to fire at the final drag point. Quick taps
- *             still snap-fire — so Tap-mode muscle memory is preserved.
- *
- * Desktop always uses cursor-aim fire-on-click. The mode only matters on
- * touch devices where there's no persistent pointer position.
+ * Desktop: mouse position = aim. Click/Space fires. Right-click detaches.
+ * Mobile: touch position = aim. Touch starts aiming (guide visible),
+ *   release fires. Quick taps snap-fire. Detach on touch when swinging.
  */
-export type TouchMode = 'tap' | 'aim';
-
 export interface InputState {
   // Aim
   aimX: number;
@@ -27,8 +20,8 @@ export interface InputState {
   // One-shot
   firePressed: boolean;
   detachPressed: boolean;
-  // Preview: true when the player is currently holding a pre-aim drag
-  // (mobile Aim mode only). The scene uses this to draw the aim guide.
+  // Preview: true when the player is currently touching the screen
+  // (mobile only). The scene uses this to draw the aim guide.
   aiming: boolean;
   // Analog joystick axes — range [-1, 1].
   // Set by the virtual joystick on touch; derived from keyboard (±1) on desktop.
@@ -42,9 +35,6 @@ interface TouchZone {
   w: number;
   h: number;
 }
-
-const HOLD_AIM_MS = 110;
-const TOUCH_MODE_KEY = 'harness.touchMode';
 
 export class InputController {
   private scene: Phaser.Scene;
@@ -68,11 +58,8 @@ export class InputController {
    */
   private touchHold = { left: false, right: false, reelUp: false, reelDown: false };
 
-  /** Mobile-only aim state for pre-aim drag. */
-  private dragStartAt = 0;
+  /** Mobile-only: tracks which pointer is doing the aim drag. */
   private dragPointerId: number | null = null;
-  private dragResolvedAsAim = false;
-  touchMode: TouchMode = 'tap';
 
   readonly state: InputState = {
     aimX: 0,
@@ -94,7 +81,6 @@ export class InputController {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.loadTouchMode();
 
     const kb = scene.input.keyboard!;
     this.keys = {
@@ -112,29 +98,25 @@ export class InputController {
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (this.isOverTouchZone(p.x, p.y)) return;
 
-      // Desktop right-click: always hard detach.
       if (p.rightButtonDown()) {
         this.state.detachPressed = true;
         return;
       }
 
-      if (this.isTouchDevice() && this.touchMode === 'aim') {
-        // Start a pre-aim drag; fire is resolved on pointerup.
-        this.dragStartAt = scene.time.now;
+      if (this.isTouchDevice()) {
+        // Mobile: start aim tracking, detach immediately if swinging.
         this.dragPointerId = p.id;
-        this.dragResolvedAsAim = false;
         this.state.aimX = p.worldX;
         this.state.aimY = p.worldY;
+        this.state.aiming = true;
+        this.state.detachPressed = true;
         return;
       }
 
-      // Default (desktop click or mobile tap mode): fire at pointer.
-      // Both flags are set so GameScene can fire when IDLE or detach when SWINGING.
+      // Desktop: click fires at mouse position.
       if (p.leftButtonDown()) {
-        this.state.aimX = p.worldX;
-        this.state.aimY = p.worldY;
         this.state.firePressed = true;
-        if (this.isTouchDevice()) this.state.detachPressed = true;
+        this.state.detachPressed = true;
       }
     });
 
@@ -142,10 +124,6 @@ export class InputController {
       if (this.dragPointerId !== null && p.id === this.dragPointerId) {
         this.state.aimX = p.worldX;
         this.state.aimY = p.worldY;
-        if (!this.dragResolvedAsAim && scene.time.now - this.dragStartAt >= HOLD_AIM_MS) {
-          this.dragResolvedAsAim = true;
-          this.state.aiming = true;
-        }
       }
     });
 
@@ -153,28 +131,22 @@ export class InputController {
       if (this.dragPointerId !== null && p.id === this.dragPointerId) {
         this.state.aimX = p.worldX;
         this.state.aimY = p.worldY;
-        // Both flags: fire when IDLE, detach when SWINGING — GameScene decides.
         this.state.firePressed = true;
         this.state.detachPressed = true;
         this.state.aiming = false;
         this.dragPointerId = null;
-        this.dragResolvedAsAim = false;
       }
     });
 
     scene.input.on('pointerupoutside', (p: Phaser.Input.Pointer) => {
       if (this.dragPointerId !== null && p.id === this.dragPointerId) {
         this.dragPointerId = null;
-        this.dragResolvedAsAim = false;
         this.state.aiming = false;
       }
     });
 
-    // Prevent right-click context menu stealing the detach input.
     scene.input.mouse?.disableContextMenu();
 
-    // Space can either fire or detach depending on player state;
-    // we raise both one-shot flags and let the game decide.
     kb.on('keydown-SPACE', () => {
       this.state.firePressed = true;
       this.state.detachPressed = true;
@@ -205,27 +177,11 @@ export class InputController {
     this.touchZones.push({ x, y, w, h });
   }
 
-  setTouchMode(mode: TouchMode): void {
-    this.touchMode = mode;
-    try {
-      localStorage.setItem(TOUCH_MODE_KEY, mode);
-    } catch {
-      // localStorage may be unavailable (private browsing, itch iframe). ignore.
-    }
-  }
-
-  toggleTouchMode(): TouchMode {
-    this.setTouchMode(this.touchMode === 'tap' ? 'aim' : 'tap');
-    return this.touchMode;
-  }
-
-  private loadTouchMode(): void {
-    try {
-      const saved = localStorage.getItem(TOUCH_MODE_KEY);
-      if (saved === 'tap' || saved === 'aim') this.touchMode = saved;
-    } catch {
-      // ignore
-    }
+  /** True when any fire/detach input is physically held (mouse, Space, touch). */
+  isAnyFireInputActive(): boolean {
+    return this.keys.SPACE.isDown ||
+      this.scene.input.activePointer.isDown ||
+      this.dragPointerId !== null;
   }
 
   isTouchDevice(): boolean {
@@ -246,15 +202,10 @@ export class InputController {
 
   /** Read per-frame. Call once per update, before consumers. */
   sample(): void {
-    // Only desktop uses the live pointer as the aim. Mobile tracks
-    // aimX/Y via pointerdown/move/up so a finger that left the screen
-    // doesn't instantly snap the aim.
-    if (!this.isTouchDevice() || this.dragPointerId === null) {
+    if (!this.isTouchDevice()) {
       const ptr = this.scene.input.activePointer;
-      if (!this.isTouchDevice()) {
-        this.state.aimX = ptr.worldX;
-        this.state.aimY = ptr.worldY;
-      }
+      this.state.aimX = ptr.worldX;
+      this.state.aimY = ptr.worldY;
     }
 
     this.state.left     = this.touchHold.left     || this.keys.A.isDown || this.keys.LEFT.isDown;
@@ -262,7 +213,6 @@ export class InputController {
     this.state.reelUp   = this.touchHold.reelUp   || this.keys.W.isDown || this.keys.UP.isDown;
     this.state.reelDown = this.touchHold.reelDown || this.keys.S.isDown || this.keys.DOWN.isDown;
 
-    // Derive analog axes from keyboard when the touch joystick is not active.
     if (!this.joySourceTouch) {
       this.state.joyX = this.state.left ? -1 : this.state.right ? 1 : 0;
       this.state.joyY = this.state.reelUp ? -1 : this.state.reelDown ? 1 : 0;

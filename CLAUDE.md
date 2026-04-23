@@ -50,21 +50,19 @@ The rope mechanic is the game. Everything else is decoration.
 
 ### Key physics constants (defaults in `src/config.ts`, runtime in `src/tuning.ts`)
 ```
-gravityY         = 1.2     // heavy — climbing costs effort, falls are punishing
-frictionAir      = 0.004   // kills missile effect post-detach without over-damping swings
+gravityY         = 0.50    // light — floaty feel, less punishing falls
+frictionAir      = 0.010   // moderate air drag, kills missile effect post-detach
 stiffness        = 1.0     // rigid — Worms rod, not bungee (not runtime-tunable)
 damping          = 0.01    // minimal → pendulum lasts (not runtime-tunable)
-reelSpeed        = 220     // px/s — slower reel for heavier feel
-swingPump        = 0.0015  // per-frame nudge force during swing
-detachImpulse    = 0.008   // kick on detach — enough to climb, no missile launches
-maxLength        = 360     // rope reach (fits 640-wide world)
-maxSpeed         = 12      // must be < thinnest wall (24px) to prevent tunneling
-aim.rotateSpeed  = 2.6     // rad/s — ~150°/sec sweep when A/D held in IDLE
-slideThreshold   = 3.0     // speed at which hard landing triggers slide punishment
-slideMinDuration = 1200    // ms controls stay locked after a hard landing
-slideDeceleration= 0.955   // per-frame multiplier on horizontal slide velocity
+reelSpeed        = 80      // px/s — deliberate rope control
+swingPump        = 0.0005  // per-frame nudge force during swing — timing matters
+maxLength        = 200     // rope reach — shorter for tighter arcs
+maxSpeed         = 5       // must be < thinnest wall (24px) to prevent tunneling
+slideThreshold   = 1.0     // speed at which surface contact triggers stun
+slideMinDuration = 200     // ms minimum stun time after surface contact
+floorFriction    = 0.98    // per-frame velocity multiplier when grounded (tunable)
 ```
-These are hard-won. Don't increase `swingPump` or `frictionAir` without testing.
+No detachImpulse — player keeps exact velocity on detach (pure momentum conservation).
 
 ### Runtime tuning system
 
@@ -75,10 +73,11 @@ All physics values above (except stiffness/damping) are **runtime-tunable**:
 - **`src/systems/TuningPanel.ts`** — in-game slider panel (press **\`** to toggle).
   Has a "Copy URL params" button to share tuning sets.
 - **`GameScene.ts`** reads `TUNING.gravityY` every frame so gravity changes are instant.
-- **`Rope.ts`** passes getter-based config to `RopeStateMachine` so `reelSpeed`,
-  `maxLength`, and `detachImpulse` update live without reconnecting.
+- **`Rope.ts`** passes getter-based config to `RopeStateMachine` so `reelSpeed`
+  and `maxLength` update live without reconnecting.
 - **`Player.ts`** reads `TUNING.frictionAir`, `TUNING.maxSpeed`, `TUNING.swingPump`,
-  `TUNING.slideThreshold`, and `TUNING.slideMinDuration` every frame.
+  `TUNING.floorFriction`, `TUNING.slideThreshold`, and `TUNING.slideMinDuration`
+  every frame.
 - **Tests** (`tests/rope.test.ts`) use their own `BASE_CFG` — completely isolated
   from `TUNING`. Never break test isolation.
 
@@ -94,7 +93,7 @@ Run with: `npm test` (vitest)
 The tested invariants:
 - State machine transitions (IDLE → FIRING → SWINGING → IDLE)
 - Reel clamping (never below `minLength`, never above `maxLength`)
-- Detach impulse direction (always away from anchor, upward bias)
+- Anchor world position tracking (static and dynamic bodies)
 - No double-constraint (refire cleans up before creating new)
 - Miss handling (no-op, stays IDLE)
 
@@ -143,62 +142,54 @@ tests/
 
 ---
 
-## Controls (Worms-style angle aim — no mouse required)
+## Controls (point-and-fire)
 
 ### Desktop
-- **A / D or ◄ / ►**: rotate aim arm (when IDLE **and grounded**) / pendulum pump (when SWINGING) — no walking
-- **Space**: fire rope (IDLE, not sliding) / detach (SWINGING)
+- **Mouse cursor**: aim position — rope fires toward cursor (up to `maxLength`)
+- **Left-click / Space**: fire rope (IDLE, not stunned) / detach (SWINGING)
 - **W / Up**: reel in
 - **S / Down**: reel out
+- **A / D or ◄ / ►**: pendulum pump (when SWINGING) — no aim rotation, no walking
 - **Right-click**: hard detach
-- **Mouse** *(optional)*: moves the aim angle when the cursor moves — never required
+- Aim guide always visible, pointing from player to cursor
 
 No jump button. The rope is the *only* way up. Grounded contact is a recovery
 perch — fire again to climb.
 
-### Mobile (portrait) — two tap modes, `ⓘ MODE` pill toggles top-left
-Mode preference persists in `localStorage` under `harness.touchMode`.
-
-**MODE · TAP** *(default, beginner)*
-- **Tap arena**: fire rope at tap point (or detach if already SWINGING)
-- **◄ ►** (bottom-left): rotate aim (IDLE and grounded) / pendulum pump (SWINGING) — no walking
-- **▲** (bottom-right, top): reel in (also fires rope if IDLE)
-- **▼** (bottom-right, bottom): reel out / detach when SWINGING
-
-**MODE · AIM** *(hard-to-master depth)*
-- Hold on arena ≥ `HOLD_AIM_MS` (110 ms) to reveal ember aim line; drag tunes angle
-  and length; release to fire at final drag point
-- Quick taps (< 110 ms) still snap-fire, preserving TAP-mode muscle memory
-- All four hold-buttons behave identically to TAP mode
-- `▲` mid-swing smoothly reels in — the Worms pendulum-tightening move and the
-  core high-level mobile skill
+### Mobile (portrait)
+- **Touch arena**: aim guide appears at touch point; release fires. Quick taps snap-fire.
+  Touch while SWINGING detaches immediately.
+- **◄ ► ▲ ▼** (bottom-left joystick): pendulum pump (SWINGING) / reel in/out
+- Joystick area is a no-fire zone — taps on the joystick don't trigger rope fire
 
 ### Key design decisions on controls
-- Mouse is optional: full game is playable keyboard-only and on mobile without mouse
-- A/D rotates aim only when **grounded**; while airborne without rope, aim auto-tracks
-  velocity at 45° upward in the direction of travel (Worms behavior — you cannot steer mid-air)
-- `firePressed` does NOT auto-detach when swinging (that breaks the Worms flow).
-  GameScene explicitly only reacts to `firePressed` when rope state is `IDLE`.
-- `firePressed` is also blocked when `isSliding()` — all controls are locked during slide.
-- Only `detachPressed` (SPACE, ▼, right-click, arena tap while SWINGING) detaches the rope
+- Desktop: mouse is required for aiming. No A/D aim rotation — aim always tracks cursor.
+- Mobile: single unified control mode (no TAP/AIM toggle). Touch = aim + fire.
+- `firePressed` is blocked when `isSliding()` — all controls are locked during stun.
 - `TouchControls` registers touch zones on `InputController` so tap-to-fire
   ignores taps that land on an on-screen button
+- **Joystick dead zone**: the joystick covers the bottom-left corner. If a target
+  happens to be behind the joystick on screen, the player must reposition. This is
+  rarely an issue since the game is vertical (you're almost always aiming upward).
 
-## Slide punishment (Worms / Jump King mechanic)
+## Stun on impact (surface contact punishment)
 
-Any contact with a surface while **not** on the rope, at speed ≥ `PHYSICS.player.slideThreshold`,
-triggers a slide:
-- **All controls are disabled** (including rope firing) until velocity drops below 0.5 px/frame
-- Physics (friction + gravity) decelerate the player naturally — no input is processed
-- The aim guide is hidden during slide (can't fire anyway)
-- Visual: player body flashes red-to-charcoal on impact
+Any contact with a surface (wall or floor) while **not** on the rope, at speed
+≥ `TUNING.slideThreshold` (default 1.0), triggers a **stun**:
+- **Rope firing is blocked** until velocity drops below 0.5 px/frame AND
+  `slideMinDuration` ms have elapsed
+- No artificial velocity injection — natural physics (floor friction, gravity, air
+  friction) decelerate the player
+- Floor friction (`TUNING.floorFriction`, default 0.98) applies per-frame when
+  grounded, both during stun and normal play
+- The aim guide is hidden during stun (can't fire anyway)
+- Visual: player body flashes red-to-phosphor on impact
 
 **Wall hits specifically** (`label: 'sidewall'`) also apply `kickFromWall()` — an outward
 horizontal impulse — so the player can never get wedged against the side walls. After the
 kick, gravity carries them downward to the bottom.
 
-This makes falling the total punishment: no escape via rope until fully stopped. Gentle
-contacts (speed < slideThreshold = 3.5) do not trigger slide.
+This makes falling the total punishment: no escape via rope until fully stopped.
 
 ## Static body labels (GameScene)
 

@@ -20,8 +20,9 @@ export class Player {
   private lastVyForLanding  = 0;
   private sliding           = false;
   private slideExpiresAt    = 0;
-  private lastHorizSign     = 1;
   private squashActive      = false;
+  private stunTumbleTween?: Phaser.Tweens.Tween;
+  private stunPulseTween?:  Phaser.Tweens.Tween;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
@@ -93,13 +94,27 @@ export class Player {
       this.sliding = true;
       this.slideExpiresAt = this.scene.time.now + TUNING.slideMinDuration;
 
-      // Worms tumble: convert impact into a horizontal skid scaled by fall
-      // speed. Big falls = fast slides that can carry you off platform edges.
-      // No vertical bounce — pure inertia slide only.
-      const vx = this.body.velocity.x;
-      const sign = Math.abs(vx) > 0.5 ? Math.sign(vx) : this.lastHorizSign;
-      const skidSpeed = Math.max(Math.abs(vx), Math.min(impactSpeed * 1.2, 12));
-      this.setVelocity(sign * skidSpeed, 0);
+      // Tumble spin on dressing only — gfx is the physics body, must not rotate.
+      const spinDir = this.body.velocity.x >= 0 ? 1 : -1;
+      const spins = Math.min(3, 1 + impactSpeed / 3);
+      this.stunTumbleTween?.stop();
+      this.stunTumbleTween = this.scene.tweens.add({
+        targets: this.dressing,
+        rotation: { from: 0, to: spinDir * Math.PI * 2 * spins },
+        duration: 300 + impactSpeed * 80,
+        ease: 'Cubic.easeOut',
+        onComplete: () => { this.dressing.setRotation(0); },
+      });
+
+      this.stunPulseTween?.stop();
+      this.stunPulseTween = this.scene.tweens.add({
+        targets: this.glowCircle,
+        fillColor: { from: 0xff2200, to: this.currentPhosphorColor },
+        alpha: { from: 0.35, to: 0.12 },
+        duration: 320,
+        yoyo: true,
+        repeat: -1,
+      });
 
       this.scene.tweens.add({
         targets: this.gfx,
@@ -128,21 +143,24 @@ export class Player {
 
   applyFloorFriction(): void {
     const vx = this.body.velocity.x;
-    if (Math.abs(vx) > 0.05) this.setVelocity(vx * 0.82, this.body.velocity.y);
+    if (Math.abs(vx) > 0.05) this.setVelocity(vx * TUNING.floorFriction, this.body.velocity.y);
   }
 
   update(input: InputState, isSwinging: boolean): void {
     const now = this.scene.time.now;
-    const v = this.body.velocity;
 
     this.body.frictionAir = TUNING.frictionAir;
 
-    if (Math.abs(v.x) > 0.5) this.lastHorizSign = v.x > 0 ? 1 : -1;
-
     if (this.sliding) {
-      if (Math.abs(v.x) > 0.05) this.setVelocity(v.x * 0.955, v.y);
-      if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.5 && now >= this.slideExpiresAt) {
+      if (this.isGrounded(now)) this.applyFloorFriction();
+      if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.12 && now >= this.slideExpiresAt) {
         this.sliding = false;
+        this.stunTumbleTween?.stop();
+        this.stunTumbleTween = undefined;
+        this.stunPulseTween?.stop();
+        this.stunPulseTween = undefined;
+        this.glowCircle.setFillStyle(this.currentPhosphorColor, 0.12);
+        this.dressing.setRotation(0);
       }
     } else {
       if (!isSwinging && this.isGrounded(now)) this.applyFloorFriction();

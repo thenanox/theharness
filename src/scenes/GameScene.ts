@@ -56,9 +56,12 @@ export class GameScene extends Phaser.Scene {
   // Win state
   private winTriggered = false;
 
-  private aimAngle = -Math.PI / 2 + 0.3;
-  private lastMouseX = -1;
-  private lastMouseY = -1;
+  // After detach, block fire until all fire/detach inputs are fully released.
+  private awaitingFireRelease = false;
+
+  // Debug free-cam (toggled with ` alongside the tuning panel)
+  private debugCam = false;
+  private debugCamKeys!: Phaser.Types.Input.Keyboard.CursorKeys;
 
   constructor() { super('Game'); }
 
@@ -112,6 +115,24 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
     this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
 
+    // Debug free-cam: ` toggles; arrow keys scroll; physics pauses.
+    this.debugCamKeys = this.input.keyboard!.createCursorKeys();
+    const matterEngine = (this.matter.world as unknown as {
+      engine: { timing: { timeScale: number } };
+    }).engine;
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== '`') return;
+      this.debugCam = !this.debugCam;
+      if (this.debugCam) {
+        this.cameras.main.stopFollow();
+        matterEngine.timing.timeScale = 0;
+      } else {
+        this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
+        this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
+        matterEngine.timing.timeScale = 1;
+      }
+    });
+
     this.fx.paintScanlines(GAME_W, GAME_H);
     this.fx.paintBottomFog(GAME_W, GAME_H);
 
@@ -120,6 +141,41 @@ export class GameScene extends Phaser.Scene {
 
     // Initial vignette
     this.fx.paintZoneVignette(this.vignetteGfx, GAME_W, GAME_H, this.phosphorColor, 1.0);
+
+    // ── Per-step velocity cap + hard sidewall clamp ───────────────────────
+    // The rope constraint (stiffness 1.0) can apply position corrections
+    // that create implicit velocity exceeding maxSpeed. Capping after every
+    // Matter step (not just once per frame in Player.update) prevents the
+    // next step from tunneling through geometry.
+    const mBody = (this.matter as unknown as {
+      body: {
+        setVelocity: (b: MatterJS.BodyType, v: { x: number; y: number }) => void;
+        setPosition: (b: MatterJS.BodyType, p: { x: number; y: number }) => void;
+      };
+    }).body;
+
+    this.matter.world.on('afterupdate', () => {
+      const body = this.player.body;
+      const v = body.velocity;
+      const speed = Math.hypot(v.x, v.y);
+      if (speed > TUNING.maxSpeed) {
+        const s = TUNING.maxSpeed / speed;
+        mBody.setVelocity(body, { x: v.x * s, y: v.y * s });
+      }
+
+      // Hard clamp: player center must stay inside sidewalls.
+      // Left wall spans x 0–32, right wall x (W-32)–W. Player half-width = 10.
+      const pos = body.position;
+      const minX = 42;
+      const maxX = W - 42;
+      if (pos.x < minX) {
+        mBody.setPosition(body, { x: minX, y: pos.y });
+        if (body.velocity.x < 0) mBody.setVelocity(body, { x: 0, y: body.velocity.y });
+      } else if (pos.x > maxX) {
+        mBody.setPosition(body, { x: maxX, y: pos.y });
+        if (body.velocity.x > 0) mBody.setVelocity(body, { x: 0, y: body.velocity.y });
+      }
+    });
 
     // ── Collision: sustained contact ─────────────────────────────────────
     this.matter.world.on(
@@ -170,14 +226,20 @@ export class GameScene extends Phaser.Scene {
           if (other.label === 'sidewall') {
             const wallX = (other as unknown as { position: { x: number } }).position.x;
             const nx = this.player.x > wallX ? 1 : -1;
-            // Relax constraint so it doesn't fight the bounce on first contact.
             this.rope.relaxConstraintToFit();
-            // Billiard reflection: flip vx, preserve vy (up-left → up-right).
             this.player.reflectOffWall(nx, 0.75);
-            if (speed >= TUNING.slideThreshold) this.triggerShake(70, 0.004);
+            if (speed >= TUNING.slideThreshold) {
+              this.triggerShake(70, 0.004);
+              if (this.rope.state !== 'SWINGING') {
+                this.fx.emberBurst(this.player.x, this.player.y);
+              }
+            }
             if (this.rope.state !== 'SWINGING') this.player.triggerSlide(speed);
           } else if (this.rope.state !== 'SWINGING') {
-            // Platform/floor: slide only when not swinging
+            if (speed >= TUNING.slideThreshold) {
+              this.fx.dustPuff(this.player.x, this.player.y + 14);
+              this.triggerShake(60, 0.003);
+            }
             this.player.triggerSlide(speed);
           }
         }
@@ -196,7 +258,7 @@ export class GameScene extends Phaser.Scene {
 
 
     const hint = this.add
-      .text(GAME_W / 2, GAME_H - 28, 'A/D aim · SPACE fire/detach · W/S reel · ◄► mobile aim',
+      .text(GAME_W / 2, GAME_H - 28, 'Click to fire · SPACE fire/detach · W/S reel · tap to fire on mobile',
         { fontFamily: 'monospace', fontSize: '10px', color: '#3aff6a' })
       .setOrigin(0.5, 1).setAlpha(0.45).setScrollFactor(0).setDepth(200);
     this.tweens.add({ targets: hint, alpha: 0, duration: 900, delay: 12000, onComplete: () => hint.destroy() });
@@ -242,52 +304,51 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setAlpha(0.9);
 
     // ── ZONE: START (y ≈ 5000..4200) — "The Foundation" ─────────────────────
-    // Extra-wide ledges teach rope basics. Generous gaps for pendulum practice.
+    // Tutorial staircase: 140-160px gaps give real pendulum room, wide
+    // platforms (350-240px) make landings forgiving. Alternates sides so
+    // each step teaches firing left vs right. Rope can always reach the
+    // next platform directly (offsets kept within maxLength=200).
 
-    // Loading dock — extra-wide welcoming platform
-    slab(W * 0.38, 4860, 260, T, THEME.palette.moss,  301);
-    // Right practice step — first short swing target
-    slab(W * 0.72, 4780, 130, T, THEME.palette.stone, 303);
-    // Left practice landing — easy back-and-forth
-    slab(W * 0.28, 4680, 160, T, THEME.palette.moss,  305);
-    // Wide central — generous landing zone
-    slab(W * 0.55, 4560, 190, T, THEME.palette.stone, 307);
-
-    // Gateway structure (Π arch) — two pillars + wide lintel. First landmark.
-    slab(W * 0.22, 4440, T,   80,  THEME.palette.stone, 309); // left pillar
-    slab(W * 0.48, 4440, T,   80,  THEME.palette.stone, 311); // right pillar
-    slab(W * 0.35, 4398, 190, T,   THEME.palette.stone, 313); // wide lintel
-
-    // Wide bridge — generous landing past the gateway
-    slab(W * 0.72, 4280, 160, T, THEME.palette.stone, 315);
-
-    // Transition toward Boiler Hall
-    slab(W * 0.25, 4180, 120, T, THEME.palette.moss,  317);
-    slab(W * 0.60, 4080,  80, T, THEME.palette.stone, 319);
+    // Step 1 — wide center, just fire up + reel
+    slab(W * 0.50, 4820, 360, T, THEME.palette.moss,  301);
+    // Step 2 — lean right, learn rightward swing
+    slab(W * 0.58, 4670, 320, T, THEME.palette.stone, 302);
+    // Step 3 — lean left, learn leftward swing
+    slab(W * 0.42, 4520, 300, T, THEME.palette.moss,  303);
+    // Step 4 — center, introduce detach timing
+    slab(W * 0.52, 4370, 280, T, THEME.palette.stone, 304);
+    // Step 5 — right, slightly narrower
+    slab(W * 0.60, 4225, 260, T, THEME.palette.moss,  305);
+    // Step 6 — left, transition into Boiler Hall
+    slab(W * 0.42, 4090, 240, T, THEME.palette.stone, 306);
 
     // ── ZONE: BOILER HALL (y ≈ 4200..3200) — "The Machine Room" ─────────────
-    // Two boiler tanks (thick columns capped with maintenance plates) force
-    // swing-around paths. A wide steam-pipe bridge offers mid-zone reprieve.
+    // Step up from tutorial. Still wide platforms but tighter gaps (80-100px).
+    // Boiler tanks add visual structure; catwalks + bridges for recovery.
 
-    // Boiler Tank 1 — body + wider cap plate (T-shape silhouette)
-    slab(W * 0.38, 4080, 55,  180, THEME.palette.stone, 401);
-    slab(W * 0.38, 3985, 100, T,   THEME.palette.moss,  403);
+    // Boiler Tank 1 — body + wider cap plate
+    slab(W * 0.38, 4060, 55,  160, THEME.palette.stone, 401);
+    slab(W * 0.38, 3975, 160, T,   THEME.palette.moss,  403);
 
     // Catwalks flanking the boiler
-    slab(W * 0.10, 4030, 55, T, THEME.palette.stone, 405);
-    slab(W * 0.88, 3920, 55, T, THEME.palette.stone, 407);
+    slab(W * 0.85, 4070, 100, T, THEME.palette.stone, 405);
+    slab(W * 0.12, 3900, 100, T, THEME.palette.stone, 407);
 
-    // Steam-pipe bridge — wide, the safe rest spot
-    slab(W * 0.52, 3770, 170, T, THEME.palette.stone, 409);
+    // Steam-pipe bridge — wide rest spot
+    slab(W * 0.55, 3810, 220, T, THEME.palette.stone, 409);
 
-    // Boiler Tank 2 — chimney column (narrower, taller feel)
-    slab(W * 0.65, 3630, 48, 160, THEME.palette.stone, 411);
+    // Stepping stone to Boiler Tank 2
+    slab(W * 0.25, 3720, 120, T, THEME.palette.moss,  410);
 
-    // Transition ledges — tighten toward Gauge Shafts
-    slab(W * 0.15, 3560, 50, T, THEME.palette.stone, 413);
-    slab(W * 0.88, 3440, 50, T, THEME.palette.ice,   415);
-    slab(W * 0.38, 3320, 60, T, THEME.palette.stone, 417);
-    slab(W * 0.12, 3230, 55, T, THEME.palette.moss,  419);
+    // Boiler Tank 2 — chimney column
+    slab(W * 0.65, 3630, 48, 140, THEME.palette.stone, 411);
+
+    // Transition ledges — wider, tighter vertical gaps
+    slab(W * 0.80, 3550, 100, T, THEME.palette.stone, 413);
+    slab(W * 0.20, 3460, 100, T, THEME.palette.ice,   415);
+    slab(W * 0.60, 3370, 100, T, THEME.palette.stone, 417);
+    slab(W * 0.15, 3280, 100, T, THEME.palette.moss,  419);
+    slab(W * 0.50, 3210, 120, T, THEME.palette.stone, 420);
 
     // ── ZONE: GAUGE SHAFTS (y ≈ 3200..2200) — "The Instrument Bay" ─────────
     // Twin gauge columns dominate. Tiny platforms demand reel-in precision.
@@ -377,17 +438,16 @@ export class GameScene extends Phaser.Scene {
     for (let y = 200; y < H; y += 320) this.fx.paintRivetRow(W * 0.5, y, W - 48, 2000 + y);
 
     // Pipe runs connecting structural landmarks
-    this.fx.paintPipeRun(W * 0.22, 4720, W * 0.50, 4720, 3001); // Gateway pillars bridge
-    this.fx.paintPipeRun(W * 0.35, 4210, W * 0.38, 4080, 3002); // Start exit → Boiler tank
-    this.fx.paintPipeRun(W * 0.10, 4030, W * 0.38, 3985, 3003); // Left catwalk → boiler cap
-    this.fx.paintPipeRun(W * 0.88, 3920, W * 0.52, 3770, 3004); // Right catwalk → steam bridge
+    this.fx.paintPipeRun(W * 0.42, 4090, W * 0.38, 4060, 3002); // Start exit → Boiler tank
+    this.fx.paintPipeRun(W * 0.12, 3900, W * 0.38, 3975, 3003); // Left catwalk → boiler cap
+    this.fx.paintPipeRun(W * 0.85, 4070, W * 0.55, 3810, 3004); // Right catwalk → steam bridge
     this.fx.paintPipeRun(W * 0.25, 3100, W * 0.75, 3050, 3005); // Gauge columns bridge
     this.fx.paintPipeRun(W * 0.28, 2460, W * 0.72, 2350, 3006); // Gauge arc markings
     this.fx.paintPipeRun(W * 0.18, 2020, W * 0.82, 1950, 3007); // Furnace wall connection
     this.fx.paintPipeRun(W * 0.30, 1340, W * 0.80, 1240, 3008); // Ignition pinch
     this.fx.paintPipeRun(W * 0.42, 830,  W * 0.58, 830,  3009); // Piston shaft bridge
 
-    const dialY = [400, 830, 1140, 1600, 1900, 2400, 2700, 3100, 3630, 3985, 4300, 4720];
+    const dialY = [400, 830, 1140, 1600, 1900, 2400, 2700, 3100, 3630, 3975, 4350, 4690];
     dialY.forEach((y, i) => {
       this.fx.paintGaugeDial(i % 2 === 0 ? 44 : GAME_W - 44, y, 13 + (i % 3) * 2, 4000 + i);
     });
@@ -462,6 +522,18 @@ export class GameScene extends Phaser.Scene {
   update(_t: number, deltaMs: number): void {
     const dt = deltaMs / 1000;
 
+    // Debug free-cam: arrow keys scroll vertically through the level.
+    if (this.debugCam) {
+      const spd = 1200 * dt;
+      if (this.debugCamKeys.up.isDown)   this.cameras.main.scrollY -= spd;
+      if (this.debugCamKeys.down.isDown) this.cameras.main.scrollY += spd;
+      this.cameras.main.scrollY = Phaser.Math.Clamp(
+        this.cameras.main.scrollY, 0, TOWER_H - GAME_H,
+      );
+      this.hudText.setText(`[DEBUG CAM]  y=${Math.round(this.cameras.main.scrollY)}`);
+      return;
+    }
+
     this.matter.world.setGravity(0, TUNING.gravityY);
 
     this.input2.sample();
@@ -473,44 +545,19 @@ export class GameScene extends Phaser.Scene {
     // Win check
     if (this.player.y <= 32 && !this.winTriggered) this.playWinSequence();
 
-    // ── Aim ───────────────────────────────────────────────────────────────
-    if (this.rope.state === 'IDLE') {
-      const grounded = this.player.isGrounded(this.time.now);
-      const sliding  = this.player.isSliding();
-
-      if (!sliding) {
-        if (grounded) {
-          // Analog joystick / keyboard rotates the aim arm.
-          if (inp.joyX !== 0) this.aimAngle += inp.joyX * TUNING.aimRotateSpeed * dt;
-          if (!this.input2.isTouchDevice()) {
-            const ptr = this.input.activePointer;
-            if (ptr.worldX !== this.lastMouseX || ptr.worldY !== this.lastMouseY) {
-              this.lastMouseX = ptr.worldX; this.lastMouseY = ptr.worldY;
-              const dx = ptr.worldX - this.player.x, dy = ptr.worldY - this.player.y;
-              if (Math.hypot(dx, dy) > 20) this.aimAngle = Math.atan2(dy, dx);
-            }
-          }
-        } else {
-          // Airborne without rope: aim auto-tracks velocity — 45° upward in
-          // direction of travel (Worms behavior). Player cannot steer the aim.
-          const vx = this.player.body.velocity.x;
-          if (Math.abs(vx) > 0.3) {
-            this.aimAngle = vx > 0 ? -Math.PI / 4 : -(3 * Math.PI) / 4;
-          } else {
-            this.aimAngle = -Math.PI / 2;
-          }
-        }
-      }
-
-      // Desktop: fire target = angle arm. Mobile: fire target = tap coords set by pointer events.
-      if (!this.input2.isTouchDevice()) {
-        inp.aimX = this.player.x + Math.cos(this.aimAngle) * TUNING.maxLength;
-        inp.aimY = this.player.y + Math.sin(this.aimAngle) * TUNING.maxLength;
-      }
+    // ── Detach / Fire ──────────────────────────────────────────────────
+    // Detach is processed first. After a detach, fire is blocked until all
+    // fire/detach inputs are fully released to prevent accidental re-fire.
+    if (inp.detachPressed && this.rope.state === 'SWINGING') {
+      this.rope.detach();
+      this.awaitingFireRelease = true;
     }
 
-    if (inp.firePressed   && this.rope.state === 'IDLE' && !this.player.isSliding()) this.rope.fireAt(inp.aimX, inp.aimY);
-    if (inp.detachPressed && this.rope.state === 'SWINGING') this.rope.detach(true);
+    if (this.awaitingFireRelease) {
+      if (!this.input2.isAnyFireInputActive()) this.awaitingFireRelease = false;
+    } else if (inp.firePressed && this.rope.state === 'IDLE' && !this.player.isSliding()) {
+      this.rope.fireAt(inp.aimX, inp.aimY);
+    }
 
     const playerInput = this.rope.state === 'SWINGING'
       ? inp : { ...inp, left: false, right: false };
@@ -544,14 +591,16 @@ export class GameScene extends Phaser.Scene {
     // ── Aim guide ─────────────────────────────────────────────────────────
     this.aimGuide.clear();
     if (this.rope.state === 'IDLE' && !this.player.isSliding()) {
-      // Guide direction: pointer during AIM drag; angle arm otherwise.
-      const gx = this.input2.isTouchDevice() && inp.aiming
-        ? inp.aimX
-        : this.player.x + Math.cos(this.aimAngle) * TUNING.maxLength;
-      const gy = this.input2.isTouchDevice() && inp.aiming
-        ? inp.aimY
-        : this.player.y + Math.sin(this.aimAngle) * TUNING.maxLength;
-      this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, gx, gy, TUNING.maxLength, inp.aiming);
+      const showGuide = !this.input2.isTouchDevice() || inp.aiming;
+      if (showGuide) {
+        this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, inp.aimX, inp.aimY, TUNING.maxLength, inp.aiming);
+      }
+    } else if (this.player.isSliding()) {
+      // Blocked indicator — red X over player so it's clear rope is locked.
+      const px = this.player.x, py = this.player.y;
+      this.aimGuide.lineStyle(2, 0xff2200, 0.5);
+      this.aimGuide.lineBetween(px - 8, py - 8, px + 8, py + 8);
+      this.aimGuide.lineBetween(px - 8, py + 8, px + 8, py - 8);
     }
 
     // ── Trajectory preview ────────────────────────────────────────────────
