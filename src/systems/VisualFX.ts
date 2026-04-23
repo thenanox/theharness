@@ -66,8 +66,10 @@ export class VisualFX {
   // ── Platform slab (phosphor wireframe) ───────────────────────────────────
 
   /**
-   * Draws a phosphor wireframe slab. Draw in white so setTint() can recolor
-   * it when zones change. Returns the Graphics object for tinting.
+   * Draws a phosphor wireframe slab with industrial plating detail.
+   * Orientation-aware: wide/short slabs get horizontal plating + rivet
+   * rows; tall/narrow slabs (walls, columns) get vertical segmentation.
+   * Drawn in white so setTint() can recolor it when zones change.
    */
   paintPhosphorSlab(
     x: number, y: number, w: number, h: number, seed = 0,
@@ -75,20 +77,111 @@ export class VisualFX {
     if (seed) this.reseed(seed);
     const g = this.scene.add.graphics();
     g.setPosition(x, y).setDepth(-10);
-    const r = Math.min(w, h) * 0.08;
 
-    // Glow pass
-    g.lineStyle(6, 0xffffff, 0.12);
-    g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
-    // Core line
-    g.lineStyle(1.5, 0xffffff, 0.9);
-    g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
-    // Hot corner dots
-    g.fillStyle(0xffffff, 0.55);
     const hx = w / 2, hy = h / 2;
-    for (const [cx, cy] of [[-hx, -hy], [hx, -hy], [-hx, hy], [hx, hy]] as const) {
-      g.fillCircle(cx, cy, 1.8);
+    const isWall = h > w * 1.6;     // tall narrow → wall / column
+    const isFloor = w > h * 4;       // very wide low → floor / ceiling
+    const r = Math.min(w, h) * 0.12;
+
+    // ── 1. Soft glow pass (behind everything) ────────────────────────────
+    g.lineStyle(6, 0xffffff, 0.10);
+    g.strokeRoundedRect(-hx, -hy, w, h, r);
+
+    // ── 2. Plating seams ─────────────────────────────────────────────────
+    g.lineStyle(1, 0xffffff, 0.28);
+    if (isWall) {
+      // Vertical wall: horizontal seams every ~80px split it into plates
+      for (let sy = -hy + 80; sy < hy - 20; sy += 80 + (this.rng() * 20 - 10)) {
+        g.lineBetween(-hx + 3, sy, hx - 3, sy);
+      }
+    } else if (isFloor) {
+      // Floor/ceiling: vertical seams every ~64px
+      for (let sx = -hx + 64; sx < hx - 20; sx += 64 + (this.rng() * 14 - 7)) {
+        g.lineBetween(sx, -hy + 3, sx, hy - 3);
+      }
+    } else if (w > 120) {
+      // Wide platform: 1-2 vertical seams to suggest 2-3 plates
+      const nSeams = w > 240 ? 2 : 1;
+      for (let i = 0; i < nSeams; i++) {
+        const sx = -hx + (w * (i + 1)) / (nSeams + 1);
+        g.lineBetween(sx, -hy + 3, sx, hy - 3);
+      }
     }
+
+    // ── 3. Outer frame (bright core line) ────────────────────────────────
+    g.lineStyle(1.5, 0xffffff, 0.9);
+    g.strokeRoundedRect(-hx, -hy, w, h, r);
+
+    // ── 4. Top highlight (catching light) ────────────────────────────────
+    // Only for platforms — gives a readable "walkable" edge
+    if (!isWall) {
+      g.lineStyle(1, 0xffffff, 0.5);
+      g.lineBetween(-hx + r, -hy + 1.5, hx - r, -hy + 1.5);
+    } else {
+      // Walls get a left/right inner highlight instead
+      g.lineStyle(1, 0xffffff, 0.35);
+      g.lineBetween(-hx + 1.5, -hy + r, -hx + 1.5, hy - r);
+      g.lineBetween( hx - 1.5, -hy + r,  hx - 1.5, hy - r);
+    }
+
+    // ── 5. Rivet rows (perimeter dots, spacing by size) ──────────────────
+    g.fillStyle(0xffffff, 0.7);
+    const rivet = (rx: number, ry: number) => g.fillCircle(rx, ry, 1.3);
+    if (isWall) {
+      // Column of rivets on left/right faces
+      const spacing = 36;
+      const pad = 10;
+      for (let ry = -hy + pad; ry <= hy - pad; ry += spacing) {
+        rivet(-hx + 4, ry);
+        rivet( hx - 4, ry);
+      }
+    } else {
+      // Horizontal rows on top/bottom edges
+      const spacing = w > 260 ? 40 : 28;
+      const pad = 10;
+      for (let rx = -hx + pad; rx <= hx - pad; rx += spacing) {
+        rivet(rx, -hy + 4);
+        rivet(rx,  hy - 4);
+      }
+      // Short walls get side rivets too
+      if (h >= 60) {
+        const vSpacing = 40;
+        for (let ry = -hy + 20; ry < hy - 10; ry += vSpacing) {
+          rivet(-hx + 4, ry);
+          rivet( hx - 4, ry);
+        }
+      }
+    }
+
+    // ── 6. Hot corner markers (signature look) ───────────────────────────
+    g.fillStyle(0xffffff, 0.9);
+    for (const [cx, cy] of [[-hx, -hy], [hx, -hy], [-hx, hy], [hx, hy]] as const) {
+      g.fillCircle(cx, cy, 2);
+    }
+
+    // ── 7. Service marker on chunky slabs (random glyph) ─────────────────
+    if (w >= 120 && h >= 40 && !isWall) {
+      const mx = (this.rng() - 0.5) * (w * 0.3);
+      const glyph = Math.floor(this.rng() * 3);
+      g.fillStyle(THEME.palette.ember, 0.55);
+      if (glyph === 0) {
+        // Tiny triangle warning mark
+        g.beginPath();
+        g.moveTo(mx, -3);
+        g.lineTo(mx - 3, 2);
+        g.lineTo(mx + 3, 2);
+        g.closePath();
+        g.fillPath();
+      } else if (glyph === 1) {
+        // Two-bar ID tag
+        g.fillRect(mx - 5, -1, 4, 2);
+        g.fillRect(mx + 1, -1, 4, 2);
+      } else {
+        // Circle stamp
+        g.fillCircle(mx, 0, 2);
+      }
+    }
+
     return g;
   }
 

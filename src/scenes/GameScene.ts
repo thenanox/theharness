@@ -41,6 +41,8 @@ export class GameScene extends Phaser.Scene {
   // Zone / phosphor state — typed as number so lerpColor can write to it
   private phosphorColor: number = ZONES[ZONES.length - 1].phosphor;
   private currentZoneName = 'Start';
+  // Index into ZONES (0 = Core, 4 = Start). Climbing = index decreases.
+  private currentZoneIndex: number = ZONES.length - 1;
   private phosphorTween?: Phaser.Tweens.Tween;
 
   // Trail ring buffer
@@ -202,6 +204,9 @@ export class GameScene extends Phaser.Scene {
           if (other.label === 'sidewall') {
             // Relax rope constraint each frame so it never pushes player INTO wall.
             this.rope.relaxConstraintToFit();
+            // Mark wall contact — used by the stun release logic so the player
+            // can exit stun once they've peeled off the wall.
+            this.player.markWallContact(this.time.now);
             // Sustained outward kick — overcomes any residual rope tension.
             const wallX = (other as unknown as { position: { x: number } }).position.x;
             const nx = this.player.x > wallX ? 1 : -1;
@@ -493,9 +498,12 @@ export class GameScene extends Phaser.Scene {
   // ── Zone transition ───────────────────────────────────────────────────────
 
   private updateZone(playerY: number): void {
-    const zone = [...ZONES].find(z => playerY <= z.maxY) ?? ZONES[ZONES.length - 1];
+    const newIndex = ZONES.findIndex(z => playerY <= z.maxY);
+    const zone = newIndex >= 0 ? ZONES[newIndex] : ZONES[ZONES.length - 1];
     if (zone.name === this.currentZoneName) return;
+    const climbing = newIndex < this.currentZoneIndex;  // index decreases going up
     this.currentZoneName = zone.name;
+    this.currentZoneIndex = newIndex;
     const targetColor = zone.phosphor;
 
     // Tween phosphor color
@@ -519,8 +527,8 @@ export class GameScene extends Phaser.Scene {
       : 0.6; // Core
     this.fx.paintZoneVignette(this.vignetteGfx, GAME_W, GAME_H, targetColor, intensity);
 
-    // Zone entry banner — quick flash with the zone name
-    this.showZoneBanner(zone.name, targetColor);
+    // Zone entry banner — only when climbing into a new zone, never when falling back
+    if (climbing) this.showZoneBanner(zone.name, targetColor);
   }
 
   private showZoneBanner(name: string, color: number): void {
@@ -587,15 +595,20 @@ export class GameScene extends Phaser.Scene {
   update(_t: number, deltaMs: number): void {
     const dt = deltaMs / 1000;
 
-    // Debug free-cam: arrow keys scroll vertically through the level.
+    // Debug free-cam: arrow keys or touch joystick scroll vertically through the level.
     if (this.debugCam) {
+      this.input2.sample();
       const spd = 1200 * dt;
-      if (this.debugCamKeys.up.isDown)   this.cameras.main.scrollY -= spd;
-      if (this.debugCamKeys.down.isDown) this.cameras.main.scrollY += spd;
+      let dy = 0;
+      if (this.debugCamKeys.up.isDown)        dy = -1;
+      else if (this.debugCamKeys.down.isDown) dy =  1;
+      else if (this.input2.state.joyY !== 0)  dy = this.input2.state.joyY; // mobile
+      this.cameras.main.scrollY += dy * spd;
       this.cameras.main.scrollY = Phaser.Math.Clamp(
         this.cameras.main.scrollY, 0, TOWER_H - GAME_H,
       );
       this.hudText.setText(`[DEBUG CAM]  y=${Math.round(this.cameras.main.scrollY)}`);
+      this.input2.clearOneShots();
       return;
     }
 
@@ -607,8 +620,9 @@ export class GameScene extends Phaser.Scene {
     // Zone update
     this.updateZone(this.player.y);
 
-    // Win check
-    if (this.player.y <= 32 && !this.winTriggered) this.playWinSequence();
+    // Win check — the ceiling blocks the player at roughly y=42 (half-height
+    // 14 + ceiling bottom at 28), so the old threshold y<=32 was unreachable.
+    if (this.player.y <= 50 && !this.winTriggered) this.playWinSequence();
 
     // ── Detach / Fire ──────────────────────────────────────────────────
     // Detach is processed first. After a detach, fire is blocked until all

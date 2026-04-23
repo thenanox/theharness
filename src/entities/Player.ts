@@ -23,6 +23,7 @@ export class Player {
 
   private lastGroundedAt    = 0;
   private lastVyForLanding  = 0;
+  private lastWallContactAt = 0;
   private sliding           = false;
   private slideExpiresAt    = 0;
   private squashActive      = false;
@@ -78,6 +79,11 @@ export class Player {
     if (!this.squashActive && this.lastVyForLanding > 2) {
       this.squashStretch(1.32, 0.72, 180);
     }
+  }
+
+  /** Called from scene collision handlers each frame the player touches a sidewall. */
+  markWallContact(now: number): void {
+    this.lastWallContactAt = now;
   }
 
   isGrounded(now: number): boolean { return now - this.lastGroundedAt < 110; }
@@ -237,14 +243,27 @@ export class Player {
 
     if (this.sliding) {
       if (this.isGrounded(now)) this.applyFloorFriction();
-      if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.12 && now >= this.slideExpiresAt) {
-        this.sliding = false;
-        this.stunTumbleTween?.stop();
-        this.stunTumbleTween = undefined;
-        this.stunPulseTween?.stop();
-        this.stunPulseTween = undefined;
-        this.glowCircle.setFillStyle(this.currentPhosphorColor, 0.12);
-        this.dressing.setRotation(0);
+      // Exit stun when: (a) min duration elapsed AND
+      //   (b1) grounded and nearly stopped (landed cleanly), OR
+      //   (b2) no longer in contact with a sidewall (peeled off → freefall or repositioned)
+      // The original check "total speed < 0.12" locked the player in stun while
+      // falling alongside a wall, because gravity kept vy high even with vx=0.
+      if (now >= this.slideExpiresAt) {
+        const vx = Math.abs(this.body.velocity.x);
+        const vy = Math.abs(this.body.velocity.y);
+        const grounded = this.isGrounded(now);
+        const wallRecent = (now - this.lastWallContactAt) < 80;
+        const landedStill = grounded && vx < 0.5 && vy < 0.5;
+        const peeledOff   = !wallRecent && !grounded;
+        if (landedStill || peeledOff) {
+          this.sliding = false;
+          this.stunTumbleTween?.stop();
+          this.stunTumbleTween = undefined;
+          this.stunPulseTween?.stop();
+          this.stunPulseTween = undefined;
+          this.glowCircle.setFillStyle(this.currentPhosphorColor, 0.12);
+          this.dressing.setRotation(0);
+        }
       }
     } else {
       if (!isSwinging && this.isGrounded(now)) this.applyFloorFriction();
