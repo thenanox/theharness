@@ -157,7 +157,7 @@ export class Player {
 
     if (this.sliding) {
       if (this.isGrounded(now)) this.applyFloorFriction();
-      if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.5 && now >= this.slideExpiresAt) {
+      if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.12 && now >= this.slideExpiresAt) {
         this.sliding = false;
         this.stunPulseTween?.stop();
         this.stunPulseTween = undefined;

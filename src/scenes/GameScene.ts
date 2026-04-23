@@ -282,54 +282,57 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setAlpha(0.9);
 
     // ── ZONE: START (y ≈ 5000..4200) — "The Foundation" ─────────────────────
-    // Tutorial zone: very wide platforms, short gaps, forgiving landings.
+    // Pure tutorial staircase. Near wall-to-wall platforms, tiny vertical
+    // gaps (60-80px). Each step teaches one swing. Can't-miss landings.
 
-    // Loading dock — huge welcoming platform
-    slab(W * 0.42, 4860, 340, T, THEME.palette.moss,  301);
-    // Right practice step — wide first swing target
-    slab(W * 0.72, 4760, 200, T, THEME.palette.stone, 303);
-    // Left practice landing — easy back-and-forth
-    slab(W * 0.28, 4650, 220, T, THEME.palette.moss,  305);
-    // Safety net — catch platform between practice steps
-    slab(W * 0.50, 4710, 120, T, THEME.palette.stone, 302);
-    // Wide central — generous landing zone
-    slab(W * 0.55, 4530, 240, T, THEME.palette.stone, 307);
-
-    // Gateway structure (Π arch) — two pillars + wide lintel. First landmark.
-    slab(W * 0.22, 4440, T,   80,  THEME.palette.stone, 309); // left pillar
-    slab(W * 0.48, 4440, T,   80,  THEME.palette.stone, 311); // right pillar
-    slab(W * 0.35, 4398, 240, T,   THEME.palette.stone, 313); // extra-wide lintel
-
-    // Wide bridge — generous landing past the gateway
-    slab(W * 0.72, 4280, 200, T, THEME.palette.stone, 315);
-
-    // Transition toward Boiler Hall — wider, with safety catch
-    slab(W * 0.25, 4180, 180, T, THEME.palette.moss,  317);
-    slab(W * 0.60, 4080, 140, T, THEME.palette.stone, 319);
+    // Step 1 — almost wall-to-wall, just fire straight up + reel
+    slab(W * 0.50, 4900, 480, T, THEME.palette.moss,  301);
+    // Step 2 — right side, first real swing target
+    slab(W * 0.62, 4830, 380, T, THEME.palette.stone, 302);
+    // Step 3 — left side, learn to swing the other way
+    slab(W * 0.38, 4760, 380, T, THEME.palette.moss,  303);
+    // Step 4 — center, gentle catch
+    slab(W * 0.50, 4690, 340, T, THEME.palette.stone, 304);
+    // Step 5 — right, slightly narrower
+    slab(W * 0.60, 4610, 300, T, THEME.palette.moss,  305);
+    // Step 6 — left
+    slab(W * 0.40, 4530, 300, T, THEME.palette.stone, 306);
+    // Step 7 — center, first hint of challenge
+    slab(W * 0.50, 4440, 260, T, THEME.palette.moss,  307);
+    // Step 8 — right, gateway region
+    slab(W * 0.62, 4350, 240, T, THEME.palette.stone, 308);
+    // Step 9 — left
+    slab(W * 0.38, 4260, 220, T, THEME.palette.moss,  309);
+    // Step 10 — transition into Boiler Hall
+    slab(W * 0.50, 4170, 200, T, THEME.palette.stone, 310);
 
     // ── ZONE: BOILER HALL (y ≈ 4200..3200) — "The Machine Room" ─────────────
-    // Slightly tighter than Start but still forgiving. Wide catwalks and
-    // a big steam-pipe bridge for recovery.
+    // Step up from tutorial. Still wide platforms but tighter gaps (80-100px).
+    // Boiler tanks add visual structure; catwalks + bridges for recovery.
 
-    // Boiler Tank 1 — body + wider cap plate (T-shape silhouette)
-    slab(W * 0.38, 4080, 55,  180, THEME.palette.stone, 401);
-    slab(W * 0.38, 3985, 140, T,   THEME.palette.moss,  403);
+    // Boiler Tank 1 — body + wider cap plate
+    slab(W * 0.38, 4060, 55,  160, THEME.palette.stone, 401);
+    slab(W * 0.38, 3975, 160, T,   THEME.palette.moss,  403);
 
-    // Catwalks flanking the boiler — wider for easier landing
-    slab(W * 0.10, 4030, 80, T, THEME.palette.stone, 405);
-    slab(W * 0.88, 3920, 80, T, THEME.palette.stone, 407);
+    // Catwalks flanking the boiler
+    slab(W * 0.85, 4070, 100, T, THEME.palette.stone, 405);
+    slab(W * 0.12, 3900, 100, T, THEME.palette.stone, 407);
 
-    // Steam-pipe bridge — wide, the safe rest spot
-    slab(W * 0.52, 3770, 210, T, THEME.palette.stone, 409);
+    // Steam-pipe bridge — wide rest spot
+    slab(W * 0.55, 3810, 220, T, THEME.palette.stone, 409);
 
-    // Boiler Tank 2 — chimney column (narrower, taller feel)
-    slab(W * 0.65, 3630, 48, 160, THEME.palette.stone, 411);
+    // Stepping stone to Boiler Tank 2
+    slab(W * 0.25, 3720, 120, T, THEME.palette.moss,  410);
 
-    // Transition ledges — tighten toward Gauge Shafts (but wider than before)
-    slab(W * 0.15, 3560, 80, T, THEME.palette.stone, 413);
-    slab(W * 0.88, 3440, 80, T, THEME.palette.ice,   415);
-    slab(W * 0.38, 3320, 90, T, THEME.palette.stone, 417);
-    slab(W * 0.12, 3230, 80, T, THEME.palette.moss,  419);
+    // Boiler Tank 2 — chimney column
+    slab(W * 0.65, 3630, 48, 140, THEME.palette.stone, 411);
+
+    // Transition ledges — wider, tighter vertical gaps
+    slab(W * 0.80, 3550, 100, T, THEME.palette.stone, 413);
+    slab(W * 0.20, 3460, 100, T, THEME.palette.ice,   415);
+    slab(W * 0.60, 3370, 100, T, THEME.palette.stone, 417);
+    slab(W * 0.15, 3280, 100, T, THEME.palette.moss,  419);
+    slab(W * 0.50, 3210, 120, T, THEME.palette.stone, 420);
 
     // ── ZONE: GAUGE SHAFTS (y ≈ 3200..2200) — "The Instrument Bay" ─────────
     // Twin gauge columns dominate. Tiny platforms demand reel-in precision.
@@ -419,17 +422,16 @@ export class GameScene extends Phaser.Scene {
     for (let y = 200; y < H; y += 320) this.fx.paintRivetRow(W * 0.5, y, W - 48, 2000 + y);
 
     // Pipe runs connecting structural landmarks
-    this.fx.paintPipeRun(W * 0.22, 4720, W * 0.50, 4720, 3001); // Gateway pillars bridge
-    this.fx.paintPipeRun(W * 0.35, 4210, W * 0.38, 4080, 3002); // Start exit → Boiler tank
-    this.fx.paintPipeRun(W * 0.10, 4030, W * 0.38, 3985, 3003); // Left catwalk → boiler cap
-    this.fx.paintPipeRun(W * 0.88, 3920, W * 0.52, 3770, 3004); // Right catwalk → steam bridge
+    this.fx.paintPipeRun(W * 0.38, 4170, W * 0.38, 4060, 3002); // Start exit → Boiler tank
+    this.fx.paintPipeRun(W * 0.12, 3900, W * 0.38, 3975, 3003); // Left catwalk → boiler cap
+    this.fx.paintPipeRun(W * 0.85, 4070, W * 0.55, 3810, 3004); // Right catwalk → steam bridge
     this.fx.paintPipeRun(W * 0.25, 3100, W * 0.75, 3050, 3005); // Gauge columns bridge
     this.fx.paintPipeRun(W * 0.28, 2460, W * 0.72, 2350, 3006); // Gauge arc markings
     this.fx.paintPipeRun(W * 0.18, 2020, W * 0.82, 1950, 3007); // Furnace wall connection
     this.fx.paintPipeRun(W * 0.30, 1340, W * 0.80, 1240, 3008); // Ignition pinch
     this.fx.paintPipeRun(W * 0.42, 830,  W * 0.58, 830,  3009); // Piston shaft bridge
 
-    const dialY = [400, 830, 1140, 1600, 1900, 2400, 2700, 3100, 3630, 3985, 4300, 4720];
+    const dialY = [400, 830, 1140, 1600, 1900, 2400, 2700, 3100, 3630, 3975, 4350, 4690];
     dialY.forEach((y, i) => {
       this.fx.paintGaugeDial(i % 2 === 0 ? 44 : GAME_W - 44, y, 13 + (i % 3) * 2, 4000 + i);
     });
