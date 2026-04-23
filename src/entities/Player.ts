@@ -21,6 +21,8 @@ export class Player {
   private sliding           = false;
   private slideExpiresAt    = 0;
   private squashActive      = false;
+  private stunTumbleTween?: Phaser.Tweens.Tween;
+  private stunPulseTween?:  Phaser.Tweens.Tween;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
@@ -92,6 +94,32 @@ export class Player {
       this.sliding = true;
       this.slideExpiresAt = this.scene.time.now + TUNING.slideMinDuration;
 
+      // Tumble spin — Worms-style loss-of-control feedback.
+      const spinDir = this.body.velocity.x >= 0 ? 1 : -1;
+      const spins = Math.min(3, 1 + impactSpeed / 3);
+      this.stunTumbleTween?.stop();
+      this.stunTumbleTween = this.scene.tweens.add({
+        targets: [this.gfx, this.dressing],
+        rotation: { from: 0, to: spinDir * Math.PI * 2 * spins },
+        duration: 300 + impactSpeed * 80,
+        ease: 'Cubic.easeOut',
+        onComplete: () => {
+          this.gfx.setRotation(0);
+          this.dressing.setRotation(0);
+        },
+      });
+
+      // Repeating red pulse so "stunned" state is visible the whole time.
+      this.stunPulseTween?.stop();
+      this.stunPulseTween = this.scene.tweens.add({
+        targets: this.glowCircle,
+        fillColor: { from: 0xff2200, to: this.currentPhosphorColor },
+        alpha: { from: 0.35, to: 0.12 },
+        duration: 320,
+        yoyo: true,
+        repeat: -1,
+      });
+
       this.scene.tweens.add({
         targets: this.gfx,
         fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
@@ -131,6 +159,11 @@ export class Player {
       if (this.isGrounded(now)) this.applyFloorFriction();
       if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.5 && now >= this.slideExpiresAt) {
         this.sliding = false;
+        this.stunPulseTween?.stop();
+        this.stunPulseTween = undefined;
+        this.glowCircle.setFillStyle(this.currentPhosphorColor, 0.12);
+        this.gfx.setRotation(0);
+        this.dressing.setRotation(0);
       }
     } else {
       if (!isSwinging && this.isGrounded(now)) this.applyFloorFriction();

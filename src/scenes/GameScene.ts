@@ -204,14 +204,20 @@ export class GameScene extends Phaser.Scene {
           if (other.label === 'sidewall') {
             const wallX = (other as unknown as { position: { x: number } }).position.x;
             const nx = this.player.x > wallX ? 1 : -1;
-            // Relax constraint so it doesn't fight the bounce on first contact.
             this.rope.relaxConstraintToFit();
-            // Billiard reflection: flip vx, preserve vy (up-left → up-right).
             this.player.reflectOffWall(nx, 0.75);
-            if (speed >= TUNING.slideThreshold) this.triggerShake(70, 0.004);
+            if (speed >= TUNING.slideThreshold) {
+              this.triggerShake(70, 0.004);
+              if (this.rope.state !== 'SWINGING') {
+                this.fx.emberBurst(this.player.x, this.player.y);
+              }
+            }
             if (this.rope.state !== 'SWINGING') this.player.triggerSlide(speed);
           } else if (this.rope.state !== 'SWINGING') {
-            // Platform/floor: slide only when not swinging
+            if (speed >= TUNING.slideThreshold) {
+              this.fx.dustPuff(this.player.x, this.player.y + 14);
+              this.triggerShake(60, 0.003);
+            }
             this.player.triggerSlide(speed);
           }
         }
@@ -276,52 +282,54 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setAlpha(0.9);
 
     // ── ZONE: START (y ≈ 5000..4200) — "The Foundation" ─────────────────────
-    // Extra-wide ledges teach rope basics. Generous gaps for pendulum practice.
+    // Tutorial zone: very wide platforms, short gaps, forgiving landings.
 
-    // Loading dock — extra-wide welcoming platform
-    slab(W * 0.38, 4860, 260, T, THEME.palette.moss,  301);
-    // Right practice step — first short swing target
-    slab(W * 0.72, 4780, 130, T, THEME.palette.stone, 303);
+    // Loading dock — huge welcoming platform
+    slab(W * 0.42, 4860, 340, T, THEME.palette.moss,  301);
+    // Right practice step — wide first swing target
+    slab(W * 0.72, 4760, 200, T, THEME.palette.stone, 303);
     // Left practice landing — easy back-and-forth
-    slab(W * 0.28, 4680, 160, T, THEME.palette.moss,  305);
+    slab(W * 0.28, 4650, 220, T, THEME.palette.moss,  305);
+    // Safety net — catch platform between practice steps
+    slab(W * 0.50, 4710, 120, T, THEME.palette.stone, 302);
     // Wide central — generous landing zone
-    slab(W * 0.55, 4560, 190, T, THEME.palette.stone, 307);
+    slab(W * 0.55, 4530, 240, T, THEME.palette.stone, 307);
 
     // Gateway structure (Π arch) — two pillars + wide lintel. First landmark.
     slab(W * 0.22, 4440, T,   80,  THEME.palette.stone, 309); // left pillar
     slab(W * 0.48, 4440, T,   80,  THEME.palette.stone, 311); // right pillar
-    slab(W * 0.35, 4398, 190, T,   THEME.palette.stone, 313); // wide lintel
+    slab(W * 0.35, 4398, 240, T,   THEME.palette.stone, 313); // extra-wide lintel
 
     // Wide bridge — generous landing past the gateway
-    slab(W * 0.72, 4280, 160, T, THEME.palette.stone, 315);
+    slab(W * 0.72, 4280, 200, T, THEME.palette.stone, 315);
 
-    // Transition toward Boiler Hall
-    slab(W * 0.25, 4180, 120, T, THEME.palette.moss,  317);
-    slab(W * 0.60, 4080,  80, T, THEME.palette.stone, 319);
+    // Transition toward Boiler Hall — wider, with safety catch
+    slab(W * 0.25, 4180, 180, T, THEME.palette.moss,  317);
+    slab(W * 0.60, 4080, 140, T, THEME.palette.stone, 319);
 
     // ── ZONE: BOILER HALL (y ≈ 4200..3200) — "The Machine Room" ─────────────
-    // Two boiler tanks (thick columns capped with maintenance plates) force
-    // swing-around paths. A wide steam-pipe bridge offers mid-zone reprieve.
+    // Slightly tighter than Start but still forgiving. Wide catwalks and
+    // a big steam-pipe bridge for recovery.
 
     // Boiler Tank 1 — body + wider cap plate (T-shape silhouette)
     slab(W * 0.38, 4080, 55,  180, THEME.palette.stone, 401);
-    slab(W * 0.38, 3985, 100, T,   THEME.palette.moss,  403);
+    slab(W * 0.38, 3985, 140, T,   THEME.palette.moss,  403);
 
-    // Catwalks flanking the boiler
-    slab(W * 0.10, 4030, 55, T, THEME.palette.stone, 405);
-    slab(W * 0.88, 3920, 55, T, THEME.palette.stone, 407);
+    // Catwalks flanking the boiler — wider for easier landing
+    slab(W * 0.10, 4030, 80, T, THEME.palette.stone, 405);
+    slab(W * 0.88, 3920, 80, T, THEME.palette.stone, 407);
 
     // Steam-pipe bridge — wide, the safe rest spot
-    slab(W * 0.52, 3770, 170, T, THEME.palette.stone, 409);
+    slab(W * 0.52, 3770, 210, T, THEME.palette.stone, 409);
 
     // Boiler Tank 2 — chimney column (narrower, taller feel)
     slab(W * 0.65, 3630, 48, 160, THEME.palette.stone, 411);
 
-    // Transition ledges — tighten toward Gauge Shafts
-    slab(W * 0.15, 3560, 50, T, THEME.palette.stone, 413);
-    slab(W * 0.88, 3440, 50, T, THEME.palette.ice,   415);
-    slab(W * 0.38, 3320, 60, T, THEME.palette.stone, 417);
-    slab(W * 0.12, 3230, 55, T, THEME.palette.moss,  419);
+    // Transition ledges — tighten toward Gauge Shafts (but wider than before)
+    slab(W * 0.15, 3560, 80, T, THEME.palette.stone, 413);
+    slab(W * 0.88, 3440, 80, T, THEME.palette.ice,   415);
+    slab(W * 0.38, 3320, 90, T, THEME.palette.stone, 417);
+    slab(W * 0.12, 3230, 80, T, THEME.palette.moss,  419);
 
     // ── ZONE: GAUGE SHAFTS (y ≈ 3200..2200) — "The Instrument Bay" ─────────
     // Twin gauge columns dominate. Tiny platforms demand reel-in precision.
@@ -553,12 +561,16 @@ export class GameScene extends Phaser.Scene {
     // ── Aim guide ─────────────────────────────────────────────────────────
     this.aimGuide.clear();
     if (this.rope.state === 'IDLE' && !this.player.isSliding()) {
-      // Desktop: always show (mouse is always present).
-      // Mobile: only show while finger is on screen (inp.aiming).
       const showGuide = !this.input2.isTouchDevice() || inp.aiming;
       if (showGuide) {
         this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, inp.aimX, inp.aimY, TUNING.maxLength, inp.aiming);
       }
+    } else if (this.player.isSliding()) {
+      // Blocked indicator — red X over player so it's clear rope is locked.
+      const px = this.player.x, py = this.player.y;
+      this.aimGuide.lineStyle(2, 0xff2200, 0.5);
+      this.aimGuide.lineBetween(px - 8, py - 8, px + 8, py + 8);
+      this.aimGuide.lineBetween(px - 8, py + 8, px + 8, py - 8);
     }
 
     // ── Trajectory preview ────────────────────────────────────────────────
