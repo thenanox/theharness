@@ -94,22 +94,18 @@ export class Player {
       this.sliding = true;
       this.slideExpiresAt = this.scene.time.now + TUNING.slideMinDuration;
 
-      // Tumble spin — Worms-style loss-of-control feedback.
+      // Tumble spin on dressing only — gfx is the physics body, must not rotate.
       const spinDir = this.body.velocity.x >= 0 ? 1 : -1;
       const spins = Math.min(3, 1 + impactSpeed / 3);
       this.stunTumbleTween?.stop();
       this.stunTumbleTween = this.scene.tweens.add({
-        targets: [this.gfx, this.dressing],
+        targets: this.dressing,
         rotation: { from: 0, to: spinDir * Math.PI * 2 * spins },
         duration: 300 + impactSpeed * 80,
         ease: 'Cubic.easeOut',
-        onComplete: () => {
-          this.gfx.setRotation(0);
-          this.dressing.setRotation(0);
-        },
+        onComplete: () => { this.dressing.setRotation(0); },
       });
 
-      // Repeating red pulse so "stunned" state is visible the whole time.
       this.stunPulseTween?.stop();
       this.stunPulseTween = this.scene.tweens.add({
         targets: this.glowCircle,
@@ -159,10 +155,11 @@ export class Player {
       if (this.isGrounded(now)) this.applyFloorFriction();
       if (Math.hypot(this.body.velocity.x, this.body.velocity.y) < 0.12 && now >= this.slideExpiresAt) {
         this.sliding = false;
+        this.stunTumbleTween?.stop();
+        this.stunTumbleTween = undefined;
         this.stunPulseTween?.stop();
         this.stunPulseTween = undefined;
         this.glowCircle.setFillStyle(this.currentPhosphorColor, 0.12);
-        this.gfx.setRotation(0);
         this.dressing.setRotation(0);
       }
     } else {
