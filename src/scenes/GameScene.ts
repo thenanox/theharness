@@ -251,13 +251,19 @@ export class GameScene extends Phaser.Scene {
                 this.fx.emberBurst(this.player.x, this.player.y);
               }
             }
-            if (this.rope.state !== 'SWINGING') this.player.triggerSlide(speed);
+            if (this.rope.state !== 'SWINGING') {
+              this.player.triggerSlide(speed);
+              // Any surface contact after detach locks fire until fully stopped.
+              this.player.lockFireUntilStill();
+            }
           } else if (this.rope.state !== 'SWINGING') {
             if (speed >= TUNING.slideThreshold) {
               this.fx.dustPuff(this.player.x, this.player.y + 14);
               this.triggerShake(60, 0.003);
             }
             this.player.triggerSlide(speed);
+            // Any surface contact after detach locks fire until fully stopped.
+            this.player.lockFireUntilStill();
           }
         }
       },
