@@ -46,32 +46,23 @@ Allow ~1-2 minutes after a push for the deployment to go live.
 
 ## Controls
 
+Point-and-fire — the rope is the only locomotion. No jump, no walking.
+
 ### Desktop
-- **A / D / arrows**: rotate aim (IDLE) / pendulum pump (SWINGING) / walk (grounded)
-- **Space / left click**: fire rope (IDLE) / detach (SWINGING)
-- **W / up**: reel in
-- **S / down**: reel out
+- **Mouse cursor**: aim (rope fires toward the cursor, up to its max length)
+- **Left-click / space**: fire rope (IDLE) / detach (SWINGING)
+- **W / up**: reel in &nbsp;·&nbsp; **S / down**: reel out
+- **A / D / ◄ / ►**: pendulum pump while swinging
 - **Right-click**: hard detach
+- Press **\`** to open the runtime physics tuning panel
 
-No jump button — the rope is the only way up.
+### Mobile (portrait 9:16)
+- **Touch the arena**: aim guide appears at the touch point, release to fire.
+  Quick taps snap-fire. Touching again while SWINGING detaches.
+- **Bottom-left joystick (◄ ► ▲ ▼)**: pendulum pump / reel in / reel out.
+  The joystick is a no-fire zone — taps on it never trigger the rope.
 
-### Mobile (touch) — two modes, `ⓘ MODE` toggle top-left
-
-**MODE · TAP** _(default, easy)_
-- Tap anywhere: fire rope at tap point (or detach if already swinging)
-- Bottom-left `◄ ►`: rotate aim (IDLE) / swing pump (SWINGING) / walk (grounded)
-- Bottom-right `▲`: reel in (also fires rope if IDLE)
-- Bottom-right `▼`: reel out (detach when swinging)
-
-**MODE · AIM** _(hard-to-master depth)_
-- Hold on the arena ≥110 ms to reveal the ember aim line
-- Drag to tune angle and length; release to fire
-- Quick taps (<110 ms) still snap-fire, so Tap-mode muscle memory carries over
-- All four hold-buttons work identically to Tap mode
-- `▲` during a swing smoothly reels in — the Worms pendulum-tightening
-  move — and is the core high-level mobile skill
-
-Game is **portrait 9:16** — plays natively on mobile in portrait orientation.
+Game plays natively in portrait orientation — no "rotate your device" overlay.
 
 ## Stack
 
