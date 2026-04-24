@@ -32,7 +32,15 @@ export class TuningPanel {
   private inputs: Map<string, HTMLInputElement> = new Map();
 
   constructor() {
+    // Idempotent: on scene restart we want to reuse the existing panel
+    // rather than stack a new DOM node + duplicate keydown listener.
+    const existing = document.getElementById('harness-tuning-panel') as HTMLDivElement | null;
+    if (existing) {
+      this.el = existing;
+      return;
+    }
     this.el = document.createElement('div');
+    this.el.id = 'harness-tuning-panel';
     this.el.style.cssText =
       'position:fixed;top:4px;right:4px;z-index:10000;' +
       'background:rgba(0,0,0,0.88);color:#3aff6a;font:11px/1.5 monospace;' +

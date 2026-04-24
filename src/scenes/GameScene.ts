@@ -70,6 +70,13 @@ export class GameScene extends Phaser.Scene {
   // Win state
   private winTriggered = false;
 
+  // Run timer (frozen on win so the final panel shows the winning time)
+  private runStartTime = 0;
+  private runElapsedMs = 0;
+  private runFrozen = false;
+  private timerText!: Phaser.GameObjects.Text;
+  private readonly BEST_TIME_KEY = 'theharness.bestTimeMs.v1';
+
   // After detach, block fire until all fire/detach inputs are fully released.
   private awaitingFireRelease = false;
 
@@ -278,7 +285,12 @@ export class GameScene extends Phaser.Scene {
       .text(GAME_W / 2, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ff7a3d' })
       .setOrigin(0.5, 0).setScrollFactor(0).setDepth(200);
 
+    this.timerText = this.add
+      .text(GAME_W - 8, 14, '00:00.00', { fontFamily: 'monospace', fontSize: '13px', color: '#3aff6a' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(200).setAlpha(0.85);
 
+    // Start run timer — ticks until win freezes it
+    this.runStartTime = this.time.now;
 
     const hint = this.add
       .text(GAME_W / 2, GAME_H - 28, 'Click to fire · SPACE fire/detach · W/S reel · tap to fire on mobile',
@@ -568,6 +580,12 @@ export class GameScene extends Phaser.Scene {
 
   private playWinSequence(): void {
     this.winTriggered = true;
+    this.runFrozen = true;
+    const elapsedMs = this.runElapsedMs;
+    const prevBest = this.loadBestTime();
+    const isNewBest = prevBest === null || elapsedMs < prevBest;
+    if (isNewBest) this.saveBestTime(elapsedMs);
+
     this.cameras.main.shake(300, 0.012);
     this.cameras.main.flash(120, 255, 180, 80);
 
@@ -586,14 +604,79 @@ export class GameScene extends Phaser.Scene {
       this.fx.steamPuff(GAME_W * 0.75, 60);
     });
 
-    this.time.delayedCall(1800, () => {
-      const banner = this.add.text(GAME_W / 2, GAME_H / 2 - 30, THEME.labels.winBanner, {
-        fontFamily: 'ui-serif, Georgia, serif', fontSize: '42px', color: '#ff7a3d',
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(9998).setAlpha(0);
-      this.tweens.add({ targets: banner, alpha: 1, duration: 600, ease: 'Sine.easeOut' });
+    // Ignition gauge dial sweep — machine-themed finale
+    this.time.delayedCall(1400, () => {
+      this.fx.playIgnitionFinale(GAME_W / 2, GAME_H * 0.42, GAME_W, GAME_H, () => {
+        this.showVictoryPanel(elapsedMs, prevBest, isNewBest);
+      });
     });
 
     this.time.delayedCall(2000, () => { this.cameras.main.zoomTo(1.0, 600); });
+  }
+
+  private showVictoryPanel(elapsedMs: number, prevBest: number | null, isNewBest: boolean): void {
+    const cx = GAME_W / 2;
+    const panelY = GAME_H * 0.68;
+
+    const banner = this.add.text(cx, GAME_H * 0.22, THEME.labels.winBanner, {
+      fontFamily: 'ui-serif, Georgia, serif', fontSize: '34px', color: '#ff7a3d',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(9998).setAlpha(0);
+    this.tweens.add({ targets: banner, alpha: 1, y: GAME_H * 0.2, duration: 500, ease: 'Sine.easeOut' });
+
+    // Stat panel: RUN + BEST, gauge-panel styling
+    const timeStr = GameScene.formatTime(elapsedMs);
+    const bestMs = isNewBest ? elapsedMs : prevBest ?? elapsedMs;
+    const bestStr = GameScene.formatTime(bestMs);
+
+    const panel = this.add.graphics().setScrollFactor(0).setDepth(9998).setAlpha(0);
+    panel.fillStyle(0x15171c, 0.92);
+    panel.fillRoundedRect(cx - 110, panelY - 44, 220, 94, 6);
+    panel.lineStyle(1.5, THEME.palette.ember, 0.9);
+    panel.strokeRoundedRect(cx - 110, panelY - 44, 220, 94, 6);
+    panel.lineStyle(1, 0xffffff, 0.2);
+    panel.lineBetween(cx - 100, panelY + 2, cx + 100, panelY + 2);
+
+    const runLabel = this.add.text(cx - 96, panelY - 32, 'RUN',
+      { fontFamily: 'monospace', fontSize: '10px', color: '#9aff60' })
+      .setScrollFactor(0).setDepth(9999).setAlpha(0);
+    const runTime = this.add.text(cx + 96, panelY - 32, timeStr,
+      { fontFamily: 'monospace', fontSize: '20px', color: '#fff5c0' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(9999).setAlpha(0);
+
+    const bestLabel = this.add.text(cx - 96, panelY + 10, isNewBest ? 'NEW BEST' : 'BEST',
+      { fontFamily: 'monospace', fontSize: '10px', color: isNewBest ? '#ff7a3d' : '#9aff60' })
+      .setScrollFactor(0).setDepth(9999).setAlpha(0);
+    const bestTime = this.add.text(cx + 96, panelY + 10, bestStr,
+      { fontFamily: 'monospace', fontSize: '18px', color: isNewBest ? '#ff7a3d' : '#ffe060' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(9999).setAlpha(0);
+
+    this.tweens.add({
+      targets: [panel, runLabel, runTime, bestLabel, bestTime],
+      alpha: 1, duration: 450, ease: 'Sine.easeOut',
+    });
+
+    // New best gets a little pulse on the value
+    if (isNewBest) {
+      this.tweens.add({
+        targets: bestTime, scale: { from: 1, to: 1.08 },
+        duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+    }
+
+    // Restart hint
+    const hint = this.add.text(cx, GAME_H - 36,
+      'press  R  to climb again',
+      { fontFamily: 'monospace', fontSize: '12px', color: '#ff7a3d' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(9999).setAlpha(0);
+    this.tweens.add({
+      targets: hint, alpha: { from: 0, to: 0.9 },
+      duration: 600, delay: 500, ease: 'Sine.easeOut',
+    });
+
+    // Enable restart. Keyboard R or a tap on the hint / panel restarts the scene.
+    const restart = () => this.scene.restart();
+    this.input.keyboard?.once('keydown-R', restart);
+    hint.setInteractive({ useHandCursor: true }).once('pointerdown', restart);
   }
 
   // ── Main loop ─────────────────────────────────────────────────────────────
@@ -746,6 +829,46 @@ export class GameScene extends Phaser.Scene {
       `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${this.player.isSliding() ? '  SLIDING' : ''}`,
     );
 
+    // ── Run timer ─────────────────────────────────────────────────────────
+    if (!this.runFrozen) {
+      this.runElapsedMs = this.time.now - this.runStartTime;
+    }
+    this.timerText.setText(GameScene.formatTime(this.runElapsedMs));
+    // Tint with current phosphor, ember once the Core is near
+    const hex = `#${this.phosphorColor.toString(16).padStart(6, '0')}`;
+    this.timerText.setColor(this.coreProximity > 0.5 ? '#ff7a3d' : hex);
+
     this.input2.clearOneShots();
+  }
+
+  // ── Time helpers / persistence ────────────────────────────────────────────
+
+  private static formatTime(ms: number): string {
+    const clamped = Math.max(0, ms);
+    const totalSec = Math.floor(clamped / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    const cs = Math.floor((clamped % 1000) / 10);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(m)}:${pad(s)}.${pad(cs)}`;
+  }
+
+  private loadBestTime(): number | null {
+    try {
+      const v = localStorage.getItem(this.BEST_TIME_KEY);
+      if (!v) return null;
+      const n = parseInt(v, 10);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private saveBestTime(ms: number): void {
+    try {
+      localStorage.setItem(this.BEST_TIME_KEY, String(Math.round(ms)));
+    } catch {
+      // Storage unavailable (private mode / quota) — best time is ephemeral.
+    }
   }
 }
