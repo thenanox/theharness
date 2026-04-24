@@ -306,22 +306,64 @@ Allow ~1–2 minutes after a push for the preview deploy to go live.
 
 ## Milestone state (April 2026)
 
-Kept in sync with `docs/PLAN.md`. Source of truth for scope discussions is
-that file — this is a quick pointer.
-
 | Milestone | Status |
 |---|---|
 | M0 — scaffold (Phaser 4 + Vite + TS + Matter) | done |
 | M1 — rope state machine + raycast + reel + detach/refire | done |
 | M2.5 — Machines theme (framing, labels, decor) | done |
 | M3.5 — branch/PR preview deploys + cleanup | done |
-| M4 — Ink & Ember visual pass (brushstrokes, CRT phosphor, parallax, particles, mobile dual-mode) | done |
+| M4 — Ink & Ember visual pass (brushstrokes, CRT phosphor, parallax, particles) | done |
 | M4.5 — Portrait pivot (480×854) + RopeStateMachine extracted + vitest suite | done |
 | M2 — camera + height HUD | partial (vertical follow in; formal height meter pending) |
 | M3 — full tower via Tiled map | pending (tall vertical arena stub in; Tiled authoring not started) |
 | M5 — persistence + Wavedash leaderboards | pending |
 | M6 — itch.io + Wavedash submissions | pending |
 | M7+ — x402 cosmetic unlocks, ghost replays | stretch (post-M6 only) |
+
+### Pending work reference
+
+**M3 — full tower (Tiled map):** replace the hand-coded vertical arena stub in
+`GameScene` with a `public/assets/maps/tower.json` exported from Tiled,
+loaded via `this.load.tilemapTiledJSON` and `this.matter.world.convertTilemapLayer`.
+One collision layer + one decoration layer. Watch for tile-seam snagging — if
+`convertTilemapLayer` produces overlapping edge bodies, fall back to a single
+composite polygon authored in a Tiled object layer.
+
+**M5 — persistence + Wavedash:**
+- `src/systems/SaveStore.ts`: versioned `localStorage` schema
+  `{ v:1, bestHeightM, unlocks: string[], receipts: [...] }`.
+- `src/systems/WavedashAdapter.ts`: thin wrapper over `WavedashJS`
+  (loaded via script tag or npm per `https://docs.wavedash.com/`).
+  - `getUser()` → HUD player name
+  - `uploadLeaderboardScore({ score: bestHeightCm, keepBest: true })` from EndScene on win
+  - Guard with `typeof WavedashJS !== 'undefined'` — must no-op on itch/Pages so one build ships everywhere.
+- Deploy: `npm run build && wavedash build push` reads `wavedash.toml`
+  (`game_id = "the-harness"`, `upload_dir = "./dist"`).
+
+**M7 stretch — x402 cosmetic unlocks** (only after M5 ships; not before):
+Cloudflare Worker in `server/` using `@x402/hono`, client calls via `@x402/fetch` +
+`viem` on Base. Flow: 402 PAYMENT-REQUIRED → wallet signs → retry →
+`{ sku, signedReceipt }` stored in `SaveStore.unlocks`. Public receipt-verify key
+can be committed; private signing key lives in Cloudflare secrets, never the repo.
+
+### Risks to remember
+
+- **Rope feel IS the game.** Matter constraints can NaN at extreme reel speeds —
+  clamp `length` per frame, cap body velocity (`maxSpeed`), keep
+  `positionIterations ≥ 8`, never set `length: 0`.
+- **Refire mid-air must destroy the old constraint first** or the player
+  double-tethers and snaps. Already enforced by `RopeStateMachine`; any rewrite
+  must preserve the "clean before re-FIRING" invariant — covered by the vitest suite.
+- **Phaser 4 tint/filter/renderer quirks** (v4 shipped Apr 10, 2026): keep
+  `roundPixels: true` explicitly (default flipped to false in v4), avoid removed
+  classes (`Point`, `Mesh`, `BitmapMask`), use native `Set`/`Map` instead of
+  `Phaser.Struct.*`, and use `setTint().setTintMode(Phaser.TintModes.FILL)`
+  (`setTintFill` was removed).
+- **Phaser Matter type gaps.** `Query.ray`, `Composite.allBodies`, and a few
+  constraint fields are loosely typed — expect occasional `as any` casts and
+  document them when needed.
+- **Wavedash CLI friction** (new platform). Do a dry-run `wavedash build push`
+  at the start of M5 with a stub `dist/` before wiring leaderboard calls.
 
 ---
 
