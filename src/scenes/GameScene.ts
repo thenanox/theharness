@@ -204,9 +204,6 @@ export class GameScene extends Phaser.Scene {
           if (other.label === 'sidewall') {
             // Relax rope constraint each frame so it never pushes player INTO wall.
             this.rope.relaxConstraintToFit();
-            // Mark wall contact — used by the stun release logic so the player
-            // can exit stun once they've peeled off the wall.
-            this.player.markWallContact(this.time.now);
             // Sustained outward kick — overcomes any residual rope tension.
             const wallX = (other as unknown as { position: { x: number } }).position.x;
             const nx = this.player.x > wallX ? 1 : -1;

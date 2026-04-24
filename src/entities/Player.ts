@@ -23,7 +23,6 @@ export class Player {
 
   private lastGroundedAt    = 0;
   private lastVyForLanding  = 0;
-  private lastWallContactAt = 0;
   private sliding           = false;
   private slideExpiresAt    = 0;
   private squashActive      = false;
@@ -79,11 +78,6 @@ export class Player {
     if (!this.squashActive && this.lastVyForLanding > 2) {
       this.squashStretch(1.32, 0.72, 180);
     }
-  }
-
-  /** Called from scene collision handlers each frame the player touches a sidewall. */
-  markWallContact(now: number): void {
-    this.lastWallContactAt = now;
   }
 
   isGrounded(now: number): boolean { return now - this.lastGroundedAt < 110; }
@@ -180,38 +174,43 @@ export class Player {
 
   triggerSlide(impactSpeed: number): void {
     if (this.sliding) return;
-    if (impactSpeed >= TUNING.slideThreshold) {
-      this.sliding = true;
-      this.slideExpiresAt = this.scene.time.now + TUNING.slideMinDuration;
+    // ANY surface contact while unattached stuns the player. Rope fire stays
+    // blocked until velocity decays to ~0 (see update() below), so even a
+    // gentle graze costs you the whole fall — there is no escape via rope.
+    this.sliding = true;
+    this.slideExpiresAt = this.scene.time.now + TUNING.slideMinDuration;
 
-      // Tumble spin on dressing only — gfx is the physics body, must not rotate.
-      const spinDir = this.body.velocity.x >= 0 ? 1 : -1;
-      const spins = Math.min(3, 1 + impactSpeed / 3);
-      this.stunTumbleTween?.stop();
-      this.stunTumbleTween = this.scene.tweens.add({
-        targets: this.dressing,
-        rotation: { from: 0, to: spinDir * Math.PI * 2 * spins },
-        duration: 300 + impactSpeed * 80,
-        ease: 'Cubic.easeOut',
-        onComplete: () => { this.dressing.setRotation(0); },
-      });
+    // Heavy visual feedback only for real impacts — a gentle bump still stuns
+    // but doesn't need to tumble / flash.
+    if (impactSpeed < TUNING.slideThreshold) return;
 
-      this.stunPulseTween?.stop();
-      this.stunPulseTween = this.scene.tweens.add({
-        targets: this.glowCircle,
-        fillColor: { from: 0xff2200, to: this.currentPhosphorColor },
-        alpha: { from: 0.35, to: 0.12 },
-        duration: 320,
-        yoyo: true,
-        repeat: -1,
-      });
+    // Tumble spin on dressing only — gfx is the physics body, must not rotate.
+    const spinDir = this.body.velocity.x >= 0 ? 1 : -1;
+    const spins = Math.min(3, 1 + impactSpeed / 3);
+    this.stunTumbleTween?.stop();
+    this.stunTumbleTween = this.scene.tweens.add({
+      targets: this.dressing,
+      rotation: { from: 0, to: spinDir * Math.PI * 2 * spins },
+      duration: 300 + impactSpeed * 80,
+      ease: 'Cubic.easeOut',
+      onComplete: () => { this.dressing.setRotation(0); },
+    });
 
-      this.scene.tweens.add({
-        targets: this.gfx,
-        fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
-        duration: 280, ease: 'Cubic.easeOut',
-      });
-    }
+    this.stunPulseTween?.stop();
+    this.stunPulseTween = this.scene.tweens.add({
+      targets: this.glowCircle,
+      fillColor: { from: 0xff2200, to: this.currentPhosphorColor },
+      alpha: { from: 0.35, to: 0.12 },
+      duration: 320,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this.scene.tweens.add({
+      targets: this.gfx,
+      fillColor: { from: 0xcc3300, to: this.currentPhosphorColor },
+      duration: 280, ease: 'Cubic.easeOut',
+    });
   }
 
   /**
@@ -243,19 +242,14 @@ export class Player {
 
     if (this.sliding) {
       if (this.isGrounded(now)) this.applyFloorFriction();
-      // Exit stun when: (a) min duration elapsed AND
-      //   (b1) grounded and nearly stopped (landed cleanly), OR
-      //   (b2) no longer in contact with a sidewall (peeled off → freefall or repositioned)
-      // The original check "total speed < 0.12" locked the player in stun while
-      // falling alongside a wall, because gravity kept vy high even with vx=0.
+      // Exit stun ONLY when min duration elapsed AND velocity is effectively
+      // zero on both axes. Falling alongside a wall, bouncing between walls,
+      // and mid-air arcs all keep you stunned — the entire descent to a
+      // dead stop is the punishment for touching anything while unattached.
       if (now >= this.slideExpiresAt) {
         const vx = Math.abs(this.body.velocity.x);
         const vy = Math.abs(this.body.velocity.y);
-        const grounded = this.isGrounded(now);
-        const wallRecent = (now - this.lastWallContactAt) < 80;
-        const landedStill = grounded && vx < 0.5 && vy < 0.5;
-        const peeledOff   = !wallRecent && !grounded;
-        if (landedStill || peeledOff) {
+        if (vx < 0.1 && vy < 0.1) {
           this.sliding = false;
           this.stunTumbleTween?.stop();
           this.stunTumbleTween = undefined;
