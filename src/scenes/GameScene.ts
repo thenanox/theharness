@@ -634,7 +634,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.awaitingFireRelease) {
       if (!this.input2.isAnyFireInputActive()) this.awaitingFireRelease = false;
-    } else if (inp.firePressed && this.rope.state === 'IDLE' && !this.player.isSliding()) {
+    } else if (inp.firePressed && this.rope.state === 'IDLE' && this.player.canFire()) {
       this.rope.fireAt(inp.aimX, inp.aimY);
     }
 
@@ -669,13 +669,14 @@ export class GameScene extends Phaser.Scene {
 
     // ── Aim guide ─────────────────────────────────────────────────────────
     this.aimGuide.clear();
-    if (this.rope.state === 'IDLE' && !this.player.isSliding()) {
+    if (this.rope.state === 'IDLE' && this.player.canFire()) {
       const showGuide = !this.input2.isTouchDevice() || inp.aiming;
       if (showGuide) {
         this.fx.drawAimGuide(this.aimGuide, this.player.x, this.player.y, inp.aimX, inp.aimY, TUNING.maxLength, inp.aiming);
       }
-    } else if (this.player.isSliding()) {
-      // Blocked indicator — red X over player so it's clear rope is locked.
+    } else if (this.rope.state === 'IDLE') {
+      // Blocked indicator — red X means: either stunned, or still moving.
+      // Fire requires velocity ≈ 0 on both axes.
       const px = this.player.x, py = this.player.y;
       this.aimGuide.lineStyle(2, 0xff2200, 0.5);
       this.aimGuide.lineBetween(px - 8, py - 8, px + 8, py + 8);

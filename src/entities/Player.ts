@@ -89,6 +89,21 @@ export class Player {
   isGrounded(now: number): boolean { return now - this.lastGroundedAt < 110; }
   isSliding():  boolean            { return this.sliding; }
 
+  /**
+   * True when velocity is effectively zero on both axes.
+   * Firing the rope requires this — no mid-air refires, no firing through
+   * residual post-collision inertia.
+   */
+  isStill(): boolean {
+    const v = this.body.velocity;
+    return Math.abs(v.x) < 0.25 && Math.abs(v.y) < 0.25;
+  }
+
+  /** Gate for rope fire: not stunned AND fully stopped. */
+  canFire(): boolean {
+    return !this.sliding && this.isStill();
+  }
+
   private currentPhosphorColor: number = THEME.palette.phosphorBase;
 
   /** Called from zone system when the phosphor color changes. */
