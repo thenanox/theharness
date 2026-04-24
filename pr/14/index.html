@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="description" content="The Harness — a one-run rope-climbing platformer for Gamedev.js Jam 2026" />
+    <meta name="theme-color" content="#f4efe6" />
+    <title>The Harness</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        /* "Ink & Ember" paper-white so the game canvas blends with the page */
+        background: #f4efe6;
+        color: #1b1c21;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+      #game-container {
+        width: 100%;
+        height: 100%;
+        touch-action: none;       /* don't let browser steal touch gestures */
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+      /* Phaser Scale.FIT + CENTER_BOTH positions the canvas itself. */
+    </style>
+    <script type="module" crossorigin src="/theharness/pr/14/assets/index-TsvW9KRi.js"></script>
+    <link rel="modulepreload" crossorigin href="/theharness/pr/14/assets/phaser-DQYafuF8.js">
+  </head>
+  <body>
+    <div id="game-container"></div>
+  </body>
+</html>
