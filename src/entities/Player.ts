@@ -89,6 +89,27 @@ export class Player {
   isGrounded(now: number): boolean { return now - this.lastGroundedAt < 110; }
   isSliding():  boolean            { return this.sliding; }
 
+  /** True when velocity is effectively zero on both axes. */
+  isStill(): boolean {
+    const v = this.body.velocity;
+    return Math.abs(v.x) < 0.25 && Math.abs(v.y) < 0.25;
+  }
+
+  /**
+   * Post-collision fire lock.
+   * Set by GameScene when the player (not swinging) touches any surface.
+   * Cleared automatically in update() once isStill() — i.e. you must come to
+   * a full stop before you can fire the rope again.
+   */
+  private fireLocked = false;
+  lockFireUntilStill(): void { this.fireLocked = true; }
+  isFireLocked():       boolean { return this.fireLocked; }
+
+  /** Gate for rope fire: not stunned AND not locked by post-collision inertia. */
+  canFire(): boolean {
+    return !this.sliding && !this.fireLocked;
+  }
+
   private currentPhosphorColor: number = THEME.palette.phosphorBase;
 
   /** Called from zone system when the phosphor color changes. */
@@ -240,6 +261,13 @@ export class Player {
     const now = this.scene.time.now;
 
     this.body.frictionAir = TUNING.frictionAir;
+
+    // Post-collision fire lock auto-releases once the player is fully stopped.
+    // Swinging clears it immediately — while on the rope you're obviously not
+    // blocked from the next shot.
+    if (this.fireLocked && (isSwinging || this.isStill())) {
+      this.fireLocked = false;
+    }
 
     if (this.sliding) {
       if (this.isGrounded(now)) this.applyFloorFriction();

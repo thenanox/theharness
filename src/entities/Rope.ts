@@ -13,7 +13,8 @@ type MatterConstraint = MatterJS.ConstraintType;
 
 interface RayHit {
   point: { x: number; y: number };
-  body: MatterBody;
+  /** Anchor body, or null when the ray was blocked by a non-anchorable surface (sidewall). */
+  body: MatterBody | null;
 }
 
 /**
@@ -98,8 +99,10 @@ export class Rope {
       duration: PHYSICS.rope.fireTravelMs,
       ease: 'Cubic.easeOut',
       onComplete: () => {
-        if (hit) {
-          this.attach(hit);
+        // Only anchor if the ray landed on an anchorable body.
+        // Sidewalls return a hit with body=null → treated as miss (ricochet at wall).
+        if (hit && hit.body) {
+          this.attach(hit as RayHit & { body: MatterBody });
         } else {
           this.flashRicochet(tx, ty, nx, ny);
           this.fireTween = this.scene.tweens.add({
@@ -118,7 +121,7 @@ export class Rope {
     });
   }
 
-  private attach(hit: RayHit): void {
+  private attach(hit: RayHit & { body: MatterBody }): void {
     this.fx?.inkSplash(hit.point.x, hit.point.y, 8);
     this.fx?.emberBurst(hit.point.x, hit.point.y);
     this.player.squashStretch(0.82, 1.28, 120);
@@ -254,6 +257,11 @@ export class Rope {
       for (const b of bodies) {
         if (b === this.player.body) continue;
         if (b.label === 'player') continue;
+        // Sidewalls stop the hook but do not anchor — forces genuine swinging.
+        // The caller treats body=null as a miss (ricochet off the wall).
+        if (b.label === 'sidewall') {
+          return { point: { x: px, y: py }, body: null };
+        }
         return { point: { x: px, y: py }, body: b };
       }
     }
