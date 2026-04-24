@@ -103,21 +103,14 @@ export class InputController {
         return;
       }
 
-      if (this.isTouchDevice()) {
-        // Mobile: start aim tracking, detach immediately if swinging.
-        this.dragPointerId = p.id;
-        this.state.aimX = p.worldX;
-        this.state.aimY = p.worldY;
-        this.state.aiming = true;
-        this.state.detachPressed = true;
-        return;
-      }
-
-      // Desktop: click fires at mouse position.
-      if (p.leftButtonDown()) {
-        this.state.firePressed = true;
-        this.state.detachPressed = true;
-      }
+      // Unified (desktop + mobile): pointerdown detaches and starts aiming.
+      // The rope is NOT fired until pointerup — holding the button keeps the
+      // player detached and aiming; release = fire at cursor.
+      this.dragPointerId = p.id;
+      this.state.aimX = p.worldX;
+      this.state.aimY = p.worldY;
+      this.state.aiming = true;
+      this.state.detachPressed = true;
     });
 
     scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {

@@ -275,7 +275,7 @@ export class GameScene extends Phaser.Scene {
 
 
     const hint = this.add
-      .text(GAME_W / 2, GAME_H - 28, 'Click to fire · SPACE fire/detach · W/S reel · tap to fire on mobile',
+      .text(GAME_W / 2, GAME_H - 28, 'Hold click to aim · release to fire · SPACE fire/detach · W/S reel',
         { fontFamily: 'monospace', fontSize: '10px', color: '#3aff6a' })
       .setOrigin(0.5, 1).setAlpha(0.45).setScrollFactor(0).setDepth(200);
     this.tweens.add({ targets: hint, alpha: 0, duration: 900, delay: 12000, onComplete: () => hint.destroy() });
@@ -625,16 +625,23 @@ export class GameScene extends Phaser.Scene {
     if (this.player.y <= 50 && !this.winTriggered) this.playWinSequence();
 
     // ── Detach / Fire ──────────────────────────────────────────────────
-    // Detach is processed first. After a detach, fire is blocked until all
-    // fire/detach inputs are fully released to prevent accidental re-fire.
+    // Click gesture: pointerdown detaches, pointerup fires at cursor.
+    // Holding the button keeps the player detached and aiming.
+    // awaitingFireRelease blocks fire while any fire input is still held, so
+    // a held click/Space doesn't instantly re-fire after its detach.
     if (inp.detachPressed && this.rope.state === 'SWINGING') {
       this.rope.detach();
       this.awaitingFireRelease = true;
     }
 
-    if (this.awaitingFireRelease) {
-      if (!this.input2.isAnyFireInputActive()) this.awaitingFireRelease = false;
-    } else if (inp.firePressed && this.rope.state === 'IDLE' && !this.player.isSliding()) {
+    // Clear the gate once all fire inputs are released. Independent of the
+    // fire check below so the same pointerup frame can both clear and fire.
+    if (this.awaitingFireRelease && !this.input2.isAnyFireInputActive()) {
+      this.awaitingFireRelease = false;
+    }
+
+    if (!this.awaitingFireRelease && inp.firePressed
+        && this.rope.state === 'IDLE' && !this.player.isSliding()) {
       this.rope.fireAt(inp.aimX, inp.aimY);
     }
 
