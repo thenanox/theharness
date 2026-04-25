@@ -15,11 +15,27 @@ burns out.
 Inspired by the Worms Ninja Rope and Jump King: a single life, a single
 rope, and a tower that wants you at the bottom.
 
-Visual direction: **"Ink & Ember"** — a sumi-e ink-wash world of oiled
-iron, frosted gauge glass, and oxidized copper, where the ember cable is
-the only warm thing on screen. On ignition, the machine fires back up
-and the world re-colors for the first and only time. Easy to learn,
-hard to master.
+Visual direction: **"Dead Oscilloscope / CRT Phosphor"** — near-black screen
+with a single phosphor trace that warms from cold green at the base to
+white-hot at the ignition core. One ember cable, one run. On ignition,
+the machine fires back up and the world re-colors for the first and only
+time.
+
+---
+
+## Jam entry
+
+**Gamedev.js Jam 2026** · April 13–26, 2026 · Theme: MACHINES
+→ https://itch.io/jam/gamedevjs-2026
+
+Challenges targeted:
+- **Theme — MACHINES** — the tower IS a dead machine; the winch cable is the last
+  live mechanism; winning reignites the core
+- **Build it with Phaser** — Phaser 4 + Matter.js rigid-rope constraint
+- **Open Source** — MIT, public repo, gitleaks on every push
+- **Deploy to Wavedash** — leaderboard integration (best completion time)
+
+---
 
 ## Play
 
@@ -44,6 +60,25 @@ a branch is deleted or a PR is closed.
 
 Allow ~1-2 minutes after a push for the deployment to go live.
 
+---
+
+## How it was made
+
+**The Harness was built entirely with [Claude Code](https://claude.ai/code)**
+— Anthropic's AI coding assistant — operated exclusively from a **mobile
+phone**, with no laptop or desktop involved at any point during development.
+
+The entire game — rope physics, level design, visual effects, input system,
+CI/CD pipelines, tests, and this README — was authored through conversation
+with Claude Code over the 13-day jam window. Each feature was developed on
+a dedicated branch, reviewed as a PR, and merged to main. The 16 PRs in
+this repo tell the full story of how the game evolved from a blank scaffold
+to a complete, playable jam entry.
+
+No traditional IDE. No keyboard. Just a phone and a model.
+
+---
+
 ## Controls
 
 Point-and-fire — the rope is the only locomotion. No jump, no walking.
@@ -64,12 +99,17 @@ Point-and-fire — the rope is the only locomotion. No jump, no walking.
 
 Game plays natively in portrait orientation — no "rotate your device" overlay.
 
+---
+
 ## Stack
 
 - [Phaser 4](https://phaser.io/) + Matter.js (rope physics via distance constraint)
 - TypeScript + Vite
-- Procedural "Ink & Ember" rendering via Phaser Graphics API (no tilesets yet)
-- Tiled (level authoring — later milestone)
+- Procedural "Ink & Ember / Dead Oscilloscope" rendering via Phaser Graphics API
+  (no tilesets, no external art assets — artist-free for a jam)
+- Vitest test suite covering the rope state machine (mandatory pre-merge)
+
+---
 
 ## Build
 
@@ -78,11 +118,15 @@ npm install
 npm run dev          # dev server at http://localhost:5173
 npm run build        # produces ./dist with VITE_BASE defaults to './'
 npm run typecheck    # tsc --noEmit
+npm test             # vitest watch
+npm run test:run     # vitest one-shot (CI)
 ```
 
 For GitHub Pages builds, the CI workflow sets `VITE_BASE` automatically
 from the branch/PR context. If you want to build locally with a specific
 base, set `VITE_BASE=/theharness/` before `npm run build`.
+
+---
 
 ## Deploy targets
 
@@ -95,7 +139,9 @@ The same `dist/` build ships to three places:
   upload as HTML5 (viewport 480×854 portrait). Default `VITE_BASE='./'` already
   works inside the itch iframe.
 - **Wavedash**: `npm run build && wavedash build push` (reads
-  `wavedash.toml`, uploads `./dist`).
+  `wavedash.toml`, uploads `./dist`). Leaderboard scores best completion time.
+
+---
 
 ## Audio
 
@@ -105,16 +151,7 @@ If the file is missing at load time the game runs silent — no crash.
 Drop a new track into that folder, push, and the next preview deploy
 picks it up.
 
-## Challenges targeted
-
-- **Theme — MACHINES** — the harness itself is a mechanical winch + climbing
-  rig, and the entire level is the internals of a single dead machine the
-  player is trying to reignite. One ember cable is the only live machinery
-  on screen until the win-moment ignition reveal.
-- **Build it with Phaser** — Phaser 4 + Matter
-- **Open Source** — MIT licensed, public repo, gitleaks scans, `SECURITY.md`
-- **Deploy to Wavedash** — `WavedashJS` leaderboard integration (M5)
-- **Ethereum** _(stretch)_ — x402 cosmetic unlocks on Base
+---
 
 ## Security & open-source hygiene
 
@@ -126,6 +163,8 @@ The repo is public. We take care to never publish secrets or tokens:
   never in the repo
 - Report vulnerabilities: see [`SECURITY.md`](./SECURITY.md)
 - Asset attribution: see [`CREDITS.md`](./CREDITS.md)
+
+---
 
 ## License
 
