@@ -9,6 +9,7 @@ import { VisualFX } from '../systems/VisualFX';
 import { AudioBus } from '../systems/AudioBus';
 import { SaveStore } from '../systems/SaveStore';
 import { Wavedash } from '../systems/WavedashAdapter';
+import { IS_DEBUG } from '../flags';
 import { Player } from '../entities/Player';
 import { Rope } from '../entities/Rope';
 
@@ -94,7 +95,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(GAME_W / WORLD_W);
     this.cameras.main.setBackgroundColor(THEME.palette.screenBg);
     this.matter.world.setGravity(0, TUNING.gravityY);
-    new TuningPanel();
+    if (IS_DEBUG) new TuningPanel();
     this.matter.world.setBounds(0, -200, W, H + 200);
 
     this.fx = new VisualFX(this);
@@ -144,18 +145,20 @@ export class GameScene extends Phaser.Scene {
     const matterEngine = (this.matter.world as unknown as {
       engine: { timing: { timeScale: number } };
     }).engine;
-    window.addEventListener('keydown', (e) => {
-      if (e.key !== '`') return;
-      this.debugCam = !this.debugCam;
-      if (this.debugCam) {
-        this.cameras.main.stopFollow();
-        matterEngine.timing.timeScale = 0;
-      } else {
-        this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
-        this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
-        matterEngine.timing.timeScale = 1;
-      }
-    });
+    if (IS_DEBUG) {
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== '`') return;
+        this.debugCam = !this.debugCam;
+        if (this.debugCam) {
+          this.cameras.main.stopFollow();
+          matterEngine.timing.timeScale = 0;
+        } else {
+          this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
+          this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
+          matterEngine.timing.timeScale = 1;
+        }
+      });
+    }
 
     this.fx.paintScanlines(GAME_W, GAME_H);
     this.fx.paintBottomFog(GAME_W, GAME_H);
@@ -280,9 +283,14 @@ export class GameScene extends Phaser.Scene {
     );
 
     // ── HUD ───────────────────────────────────────────────────────────────
+    // FPS / rope-state readout: debug only.
     this.hudText = this.add
       .text(8, 8, '', { fontFamily: 'monospace', fontSize: '11px', color: '#3aff6a' })
-      .setScrollFactor(0).setDepth(200).setAlpha(0.5);
+      .setScrollFactor(0).setDepth(200).setAlpha(0.5)
+      .setVisible(IS_DEBUG);
+
+    // Mute toggle — top-left corner. Driven by SaveStore so it sticks.
+    this.buildMuteButton();
 
     this.heightText = this.add
       .text(GAME_W / 2, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ff7a3d' })
@@ -862,9 +870,11 @@ export class GameScene extends Phaser.Scene {
     this.heightText.setText(metersLeft > 0 ? `${metersLeft} m` : 'CLIMB!');
     this.heightText.setColor(this.phosphorColor > 0x888800 ? '#ff7a3d' : `#${this.phosphorColor.toString(16).padStart(6, '0')}`);
 
-    this.hudText.setText(
-      `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${this.player.isSliding() ? '  SLIDING' : ''}`,
-    );
+    if (IS_DEBUG) {
+      this.hudText.setText(
+        `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${this.player.isSliding() ? '  SLIDING' : ''}`,
+      );
+    }
 
     // ── Run timer ─────────────────────────────────────────────────────────
     if (!this.runFrozen) {
@@ -876,6 +886,91 @@ export class GameScene extends Phaser.Scene {
     this.timerText.setColor(this.coreProximity > 0.5 ? '#ff7a3d' : hex);
 
     this.input2.clearOneShots();
+  }
+
+  // ── Mute button ────────────────────────────────────────────────────────
+
+  /**
+   * Top-left mute toggle. The button lives in HUD space (scroll-locked,
+   * depth 200) and reads/writes its state through SaveStore so the
+   * preference sticks across runs and across scene restarts.
+   *
+   * The icon is a tiny speaker drawn programmatically — no glyph fonts /
+   * emoji to fail on. When muted, the speaker is dimmed and a diagonal
+   * line crosses it.
+   */
+  private buildMuteButton(): void {
+    // Sync AudioBus to the persisted preference *before* anything plays.
+    AudioBus.setMuted(SaveStore.isMuted());
+
+    const cx = 18, cy = 18;       // button center, top-left corner
+    const size = 32;              // hit area edge
+
+    // Register with InputController so taps here don't fire the rope.
+    this.input2.registerTouchZone(cx - size / 2, cy - size / 2, size, size);
+
+    const hit = this.add
+      .rectangle(cx, cy, size, size, 0x000000, 0.0)
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(199)
+      .setInteractive({ useHandCursor: true });
+
+    const icon = this.add
+      .graphics()
+      .setScrollFactor(0)
+      .setDepth(200);
+
+    const draw = () => {
+      const muted = SaveStore.isMuted();
+      const color = muted ? 0x636572 : 0x3aff6a;
+      const alpha = muted ? 0.6 : 0.9;
+      icon.clear();
+      // Backplate
+      icon.fillStyle(0x15171c, 0.55);
+      icon.fillRoundedRect(cx - size / 2, cy - size / 2, size, size, 4);
+      icon.lineStyle(1, color, alpha * 0.5);
+      icon.strokeRoundedRect(cx - size / 2, cy - size / 2, size, size, 4);
+
+      // Speaker box (left rectangle)
+      icon.fillStyle(color, alpha);
+      icon.fillRect(cx - 8, cy - 3, 4, 6);
+      // Speaker horn (trapezoid)
+      icon.beginPath();
+      icon.moveTo(cx - 4, cy - 3);
+      icon.lineTo(cx + 1, cy - 7);
+      icon.lineTo(cx + 1, cy + 7);
+      icon.lineTo(cx - 4, cy + 3);
+      icon.closePath();
+      icon.fillPath();
+
+      if (!muted) {
+        // Sound waves
+        icon.lineStyle(1.2, color, alpha);
+        icon.beginPath();
+        icon.arc(cx + 3, cy, 3, -Math.PI / 3, Math.PI / 3, false);
+        icon.strokePath();
+        icon.beginPath();
+        icon.arc(cx + 3, cy, 6, -Math.PI / 3, Math.PI / 3, false);
+        icon.strokePath();
+      } else {
+        // Diagonal strike
+        icon.lineStyle(1.5, 0xff5040, 0.9);
+        icon.lineBetween(cx - 8, cy - 8, cx + 8, cy + 8);
+      }
+    };
+    draw();
+
+    hit.on('pointerdown', (pointer: Phaser.Input.Pointer, _x: number, _y: number, evt: Phaser.Types.Input.EventData) => {
+      const muted = !SaveStore.isMuted();
+      SaveStore.setMuted(muted);
+      AudioBus.unlock();          // first click also unlocks the audio context
+      AudioBus.setMuted(muted);
+      draw();
+      // Don't let this tap also trigger rope fire / restart on the win screen.
+      evt.stopPropagation();
+      void pointer;
+    });
   }
 
   // ── Time helpers / persistence ────────────────────────────────────────────

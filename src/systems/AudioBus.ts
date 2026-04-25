@@ -25,10 +25,14 @@ import * as Phaser from 'phaser';
 export type MusicKey = 'game' | 'win';
 export type SfxKey = 'ropeFire' | 'ropeAttach' | 'celebrate';
 
-interface DroneNodes {
-  oscillators: OscillatorNode[];
+interface SequencerHandle {
+  key: MusicKey;
+  /** setTimeout id, used to cancel future ticks. */
+  timer: ReturnType<typeof setTimeout> | null;
+  /** Current step, monotonically increasing; modulo pattern length to index. */
+  step: number;
+  /** Bus gain — fades in on start, fades out on stop, ducked under SFX. */
   gain: GainNode;
-  others: AudioNode[];
 }
 
 export class AudioBus {
@@ -36,11 +40,12 @@ export class AudioBus {
   private static fileMusicKey?: MusicKey;
   private static baseVolume = 0.55;
   private static isDucked = false;
+  private static muted = false;
 
   private static ctx: AudioContext | null = null;
   private static ctxFailed = false;
   private static masterGain: GainNode | null = null;
-  private static currentDrone: DroneNodes | null = null;
+  private static currentSeq: SequencerHandle | null = null;
 
   // ── File loading (optional override) ─────────────────────────────────────
 
@@ -87,7 +92,7 @@ export class AudioBus {
     const haveFile = scene.cache.audio.exists(fileKey);
 
     if (haveFile) {
-      this.stopSynthDrone(0.6);
+      this.stopSequencer(0.6);
       if (this.fileMusicKey === key && this.fileMusic && (this.fileMusic as { isPlaying?: boolean }).isPlaying) return;
       this.stopFileMusic();
       try {
@@ -96,14 +101,29 @@ export class AudioBus {
         this.fileMusicKey = key;
       } catch {
         // Autoplay lockout — caller will retry on next user gesture.
-        this.startSynthDrone(key);
+        this.startSequencer(key);
       }
       return;
     }
 
-    // No file → synth drone
+    // No file → synthesized rhythmic loop
     this.stopFileMusic();
-    this.startSynthDrone(key);
+    this.startSequencer(key);
+  }
+
+  /** Toggle mute. Persists nothing — caller is responsible for storage. */
+  static setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (this.masterGain) {
+      this.masterGain.gain.value = muted ? 0 : (this.isDucked ? this.baseVolume * 0.4 : this.baseVolume);
+    }
+    if (this.fileMusic) {
+      (this.fileMusic as unknown as { volume: number }).volume = muted ? 0 : this.effectiveMusicVolume();
+    }
+  }
+
+  static isMuted(): boolean {
+    return this.muted;
   }
 
   /** Lower music volume during gameplay or other foregrounded audio. */
@@ -186,78 +206,144 @@ export class AudioBus {
     this.fileMusicKey = undefined;
   }
 
-  // ── Internals: synth drone ───────────────────────────────────────────────
+  // ── Internals: rhythmic sequencer ────────────────────────────────────────
+  //
+  // Replaces the old static "drone hum" with a soft, slow-tempo arpeggio
+  // pattern. Each tick schedules a couple of short triangle/sine notes via
+  // `AudioContext` time, then re-arms a setTimeout for the next 16th note.
+  //
+  // PATTERNS
+  //   game (70 BPM, 8-step / ~3.4s loop, A minor 7):
+  //     bass A2 ▍ . . . ▍ . . .          (steps 0,4)
+  //     arp  A3 . C4 . E4 . G3 .          (every 2nd step)
+  //     hat   .  ♪ .  ♪ .  ♪ .  ♪          (off-beats, very low volume)
+  //
+  //   win (96 BPM, 8-step / ~2.5s loop, C major 7):
+  //     bass C3 ▍ . . . ▍ . . .
+  //     arp  C4 . E4 . G4 . C5 .
+  //     hat  .  ♪ .  ♪ .  ♪ .  ♪
+  //
+  // The sequencer uses `setTimeout` for the per-step heartbeat (jitter is
+  // unnoticeable at this tempo) and `AudioContext.currentTime` for the
+  // sample-accurate envelope of each note.
 
-  private static startSynthDrone(key: MusicKey): void {
+  private static startSequencer(key: MusicKey): void {
     const ctx = this.getCtx();
     if (!ctx || !this.masterGain) return;
-    this.stopSynthDrone(0.4);
+    this.stopSequencer(0.4);
 
-    // Soft pad: two oscillators a 5th apart, lowpass, slow LFO on cutoff.
-    const baseFreq = key === 'game' ? 110 : 174.61;        // A2 vs F3
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    osc1.type = 'sine';
-    osc2.type = 'triangle';
-    osc1.frequency.value = baseFreq;
-    osc2.frequency.value = baseFreq * 1.5;                   // perfect fifth
+    const seqGain = ctx.createGain();
+    seqGain.gain.setValueAtTime(0, ctx.currentTime);
+    seqGain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 0.6);
+    seqGain.connect(this.masterGain);
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = key === 'game' ? 360 : 700;
-    filter.Q.value = 0.6;
+    const handle: SequencerHandle = { key, timer: null, step: 0, gain: seqGain };
+    this.currentSeq = handle;
 
-    // LFO modulating filter cutoff for slow movement
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.type = 'sine';
-    lfo.frequency.value = key === 'game' ? 0.07 : 0.18;
-    lfoGain.gain.value = key === 'game' ? 140 : 220;
-    lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
+    const bpm = key === 'game' ? 70 : 96;
+    const stepMs = 60_000 / bpm / 2; // 8th-note grid
 
-    const droneGain = ctx.createGain();
-    const target = key === 'game' ? 0.20 : 0.30;
-    droneGain.gain.setValueAtTime(0, ctx.currentTime);
-    droneGain.gain.linearRampToValueAtTime(target, ctx.currentTime + 1.4);
-
-    osc1.connect(filter);
-    osc2.connect(filter);
-    filter.connect(droneGain);
-    droneGain.connect(this.masterGain);
-
-    osc1.start();
-    osc2.start();
-    lfo.start();
-
-    this.currentDrone = {
-      oscillators: [osc1, osc2, lfo],
-      gain: droneGain,
-      others: [filter, lfoGain],
+    const tick = () => {
+      if (this.currentSeq !== handle) return; // we got replaced / stopped
+      this.playStep(key, handle.step % 8, handle.gain);
+      handle.step++;
+      handle.timer = setTimeout(tick, stepMs);
     };
+    tick();
   }
 
-  private static stopSynthDrone(fadeSeconds = 0.4): void {
-    if (!this.currentDrone || !this.ctx) return;
-    const { oscillators, gain, others } = this.currentDrone;
+  private static stopSequencer(fadeSeconds = 0.4): void {
+    if (!this.currentSeq || !this.ctx) return;
+    const seq = this.currentSeq;
+    this.currentSeq = null;
+    if (seq.timer) clearTimeout(seq.timer);
+
     const t = this.ctx.currentTime;
     try {
-      gain.gain.cancelScheduledValues(t);
-      gain.gain.setValueAtTime(gain.gain.value, t);
-      gain.gain.linearRampToValueAtTime(0, t + fadeSeconds);
+      seq.gain.gain.cancelScheduledValues(t);
+      seq.gain.gain.setValueAtTime(seq.gain.gain.value, t);
+      seq.gain.gain.linearRampToValueAtTime(0, t + fadeSeconds);
     } catch { /* */ }
-    const stopAt = (t + fadeSeconds + 0.05) * 1000;
     setTimeout(() => {
-      for (const o of oscillators) {
-        try { o.stop(); } catch { /* */ }
-        try { o.disconnect(); } catch { /* */ }
-      }
-      for (const n of others) {
-        try { n.disconnect(); } catch { /* */ }
-      }
-      try { gain.disconnect(); } catch { /* */ }
-    }, Math.max(0, stopAt - performance.now()));
-    this.currentDrone = null;
+      try { seq.gain.disconnect(); } catch { /* */ }
+    }, (fadeSeconds + 0.1) * 1000);
+  }
+
+  private static playStep(key: MusicKey, step: number, busGain: GainNode): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+
+    if (key === 'game') {
+      // A minor seven — calm, ambient
+      const arp = [220.00, 261.63, 329.63, 196.00]; // A3 C4 E4 G3
+      if (step === 0 || step === 4) this.playNote(110.00, 0.42, 0.18, 'sine', busGain);          // A2 bass
+      if (step % 2 === 0)           this.playNote(arp[(step >> 1) % arp.length], 0.36, 0.12, 'triangle', busGain);
+      if (step % 2 === 1)           this.playHat(0.05, busGain);
+    } else {
+      // C major seven — brighter for the victory loop
+      const arp = [261.63, 329.63, 392.00, 523.25]; // C4 E4 G4 C5
+      if (step === 0 || step === 4) this.playNote(130.81, 0.34, 0.22, 'sine', busGain);          // C3 bass
+      if (step % 2 === 0)           this.playNote(arp[(step >> 1) % arp.length], 0.30, 0.16, 'triangle', busGain);
+      if (step % 2 === 1)           this.playHat(0.07, busGain);
+    }
+  }
+
+  /** Soft note: fast attack, exponential decay, lowpass-shaped. */
+  private static playNote(
+    freq: number, durSec: number, vol: number,
+    type: OscillatorType, busGain: GainNode,
+  ): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.value = freq;
+
+    const filt = ctx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 1400;
+    filt.Q.value = 0.5;
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + durSec);
+
+    osc.connect(filt);
+    filt.connect(g);
+    g.connect(busGain);
+    osc.start(t0);
+    osc.stop(t0 + durSec + 0.05);
+  }
+
+  /** Off-beat tick: very short bandpass-noise click. */
+  private static playHat(vol: number, busGain: GainNode): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const dur = 0.06;
+
+    const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() - 0.5);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+
+    const filt = ctx.createBiquadFilter();
+    filt.type = 'highpass';
+    filt.frequency.value = 5000;
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+
+    noise.connect(filt);
+    filt.connect(g);
+    g.connect(busGain);
+    noise.start(t0);
+    noise.stop(t0 + dur);
   }
 
   // ── Internals: SFX ───────────────────────────────────────────────────────

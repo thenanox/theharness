@@ -7,6 +7,7 @@
 //   bestTimeMs   — best (lowest) climb time in ms (the leaderboard score)
 //   bestHeightM  — kept as a placeholder for historical/CLAUDE.md schema;
 //                  not currently written by gameplay
+//   muted        — whether audio is muted (sticky across runs)
 //   unlocks      — sku ids redeemed via x402 (M7+, not yet wired)
 //   receipts     — { sku, signedReceipt } tuples for unlock provenance
 //
@@ -19,6 +20,7 @@ export interface SaveDataV1 {
   v: 1;
   bestTimeMs?: number;
   bestHeightM?: number;
+  muted?: boolean;
   unlocks: string[];
   receipts: { sku: string; signedReceipt: string }[];
 }
@@ -33,6 +35,7 @@ function safeParse(raw: string | null): SaveDataV1 {
       v: 1,
       bestTimeMs: typeof obj.bestTimeMs === 'number' && obj.bestTimeMs > 0 ? obj.bestTimeMs : undefined,
       bestHeightM: typeof obj.bestHeightM === 'number' && obj.bestHeightM > 0 ? obj.bestHeightM : undefined,
+      muted: typeof obj.muted === 'boolean' ? obj.muted : undefined,
       unlocks: Array.isArray(obj.unlocks) ? obj.unlocks.filter((s): s is string => typeof s === 'string') : [],
       receipts: Array.isArray(obj.receipts)
         ? obj.receipts.filter((r): r is { sku: string; signedReceipt: string } =>
@@ -80,5 +83,15 @@ export const SaveStore = {
 
   bestTimeMs(): number | null {
     return this.read().bestTimeMs ?? null;
+  },
+
+  isMuted(): boolean {
+    return this.read().muted === true;
+  },
+
+  setMuted(muted: boolean): void {
+    const data = this.read();
+    data.muted = muted;
+    this.write(data);
   },
 };
