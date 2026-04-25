@@ -4,7 +4,7 @@ name: Deploy to Wavedash
 # Also triggerable manually from the Actions tab.
 #
 # Required secret:
-#   WAVEDASH_TOKEN — your Wavedash API key (starts with wd_)
+#   WAVEDASH_TOKEN or WAVEDASH_API_KEY — your Wavedash API key (starts with wd_)
 #
 # Config is read from wavedash.toml (game_id + upload_dir).
 
@@ -36,10 +36,10 @@ jobs:
 
       - name: Validate Wavedash settings
         env:
-          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN }}
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}
         run: |
           if [ -z "$WAVEDASH_TOKEN" ]; then
-            echo "::error::Missing WAVEDASH_TOKEN secret."
+            echo "::error::Missing WAVEDASH token secret. Set WAVEDASH_TOKEN or WAVEDASH_API_KEY."
             exit 1
           fi
 
@@ -53,10 +53,10 @@ jobs:
 
       - name: Check Wavedash auth
         env:
-          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN }}
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}
         run: wavedash auth status
 
       - name: Deploy to Wavedash
         run: wavedash build push
         env:
-          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN }}
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}

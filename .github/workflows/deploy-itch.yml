@@ -6,7 +6,9 @@ name: Deploy to itch.io
 # Required secret:
 #   BUTLER_API_KEY — get it at https://itch.io/user/settings/api-keys
 #
-# Game target: thenanox/the-harness  (channel: html5)
+# Optional repo variables:
+#   ITCH_GAME    — itch target owner/slug (default: thenanox/theharness)
+#   ITCH_CHANNEL — butler channel (default: html5)
 # Create the page at https://itch.io/game/new before the first deploy.
 
 on:
@@ -46,4 +48,18 @@ jobs:
       - name: Upload to itch.io
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-        run: butler push dist/ thenanox/the-harness:html5 --userversion "${{ github.sha }}"
+          ITCH_GAME: ${{ vars.ITCH_GAME || 'thenanox/theharness' }}
+          ITCH_CHANNEL: ${{ vars.ITCH_CHANNEL || 'html5' }}
+        run: |
+          if [ -z "$BUTLER_API_KEY" ]; then
+            echo "::error::Missing BUTLER_API_KEY secret."
+            exit 1
+          fi
+
+          if [ -z "$ITCH_GAME" ] || [ -z "$ITCH_CHANNEL" ]; then
+            echo "::error::Missing itch target configuration (ITCH_GAME/ITCH_CHANNEL)."
+            exit 1
+          fi
+
+          echo "Uploading dist/ to $ITCH_GAME:$ITCH_CHANNEL"
+          butler push dist/ "$ITCH_GAME:$ITCH_CHANNEL" --userversion "${{ github.sha }}"
