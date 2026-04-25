@@ -472,6 +472,12 @@ export class GameScene extends Phaser.Scene {
     slab(W * 0.42, 830, T, 80, THEME.palette.ice,   707);
     slab(W * 0.58, 830, T, 80, THEME.palette.ice,   709);
 
+    // Center relay — 60×24, sits in the 78px gap between the piston tops
+    // (W*0.42 inner edge ≈ 281, W*0.58 inner edge ≈ 359) and 60px above
+    // them. Breaks up the diagonal piston → far-side stepping-stone swing
+    // that was the meanest jump in Core.
+    slab(W * 0.50, 730, 60, T, THEME.palette.moss,  706);
+
     // Stepping stones
     slab(W * 0.22, 710, 40, T, THEME.palette.stone, 711);
     slab(W * 0.80, 600, 40, T, THEME.palette.stone, 713);
