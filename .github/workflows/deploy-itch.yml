@@ -32,12 +32,18 @@ jobs:
         run: npm run build
         # VITE_BASE defaults to './' — correct for itch.io iframe
 
+      - name: Install Butler
+        run: |
+          for i in 1 2 3 4; do
+            curl -fsSL --retry 3 -o butler.zip \
+              "https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default" && break
+            echo "Attempt $i failed, waiting $((i * 5))s..."
+            sleep $((i * 5))
+          done
+          unzip -o butler.zip
+          chmod +x butler
+
       - name: Upload to itch.io
-        uses: Ayowel/butler-to-itch@v1.0.0
-        with:
-          butler_key: ${{ secrets.BUTLER_API_KEY }}
-          itch_user: thenanox
-          itch_game: the-harness
-          version: ${{ github.sha }}
-          channel: html5
-          package: dist/
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: ./butler push dist/ thenanox/the-harness:html5 --userversion "${{ github.sha }}"
