@@ -85,6 +85,7 @@ export class GameScene extends Phaser.Scene {
   // Debug free-cam (toggled with ` alongside the tuning panel)
   private debugCam = false;
   private debugCamKeys!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private debugToggleHandler?: (e: KeyboardEvent) => void;
 
   constructor() { super('Game'); }
 
@@ -146,7 +147,7 @@ export class GameScene extends Phaser.Scene {
       engine: { timing: { timeScale: number } };
     }).engine;
     if (IS_DEBUG) {
-      window.addEventListener('keydown', (e) => {
+      this.debugToggleHandler = (e: KeyboardEvent) => {
         if (e.key !== '`') return;
         this.debugCam = !this.debugCam;
         if (this.debugCam) {
@@ -157,8 +158,12 @@ export class GameScene extends Phaser.Scene {
           this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
           matterEngine.timing.timeScale = 1;
         }
-      });
+      };
+      window.addEventListener('keydown', this.debugToggleHandler);
     }
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onSceneShutdown, this);
+    this.events.once(Phaser.Scenes.Events.DESTROY, this.onSceneShutdown, this);
 
     this.fx.paintScanlines(GAME_W, GAME_H);
     this.fx.paintBottomFog(GAME_W, GAME_H);
@@ -323,6 +328,13 @@ export class GameScene extends Phaser.Scene {
       AudioBus.startMusic(this, 'game');
       AudioBus.duck(this, 0.6);
     });
+  }
+
+  private onSceneShutdown(): void {
+    if (this.debugToggleHandler) {
+      window.removeEventListener('keydown', this.debugToggleHandler);
+      this.debugToggleHandler = undefined;
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

@@ -38,6 +38,7 @@ interface TouchZone {
 
 export class InputController {
   private scene: Phaser.Scene;
+  private readonly touchDevice: boolean;
   private keys: {
     A: Phaser.Input.Keyboard.Key;
     D: Phaser.Input.Keyboard.Key;
@@ -81,6 +82,9 @@ export class InputController {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+    this.touchDevice =
+      scene.sys.game.device.input.touch ||
+      new URLSearchParams(window.location.search).has('touch');
 
     const kb = scene.input.keyboard!;
     this.keys = {
@@ -185,10 +189,7 @@ export class InputController {
   }
 
   isTouchDevice(): boolean {
-    return (
-      this.scene.sys.game.device.input.touch ||
-      new URLSearchParams(window.location.search).has('touch')
-    );
+    return this.touchDevice;
   }
 
   private isOverTouchZone(screenX: number, screenY: number): boolean {
