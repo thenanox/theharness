@@ -4,9 +4,7 @@ name: Deploy to Wavedash
 # Also triggerable manually from the Actions tab.
 #
 # Required secret:
-#   WAVEDASH_API_KEY — your Wavedash API key (starts with wd_)
-# Optional secret:
-#   WAVEDASH_GAME_ID — overrides game_id in wavedash.toml (useful for forks/environments)
+#   WAVEDASH_TOKEN — your Wavedash API key (starts with wd_)
 #
 # Config is read from wavedash.toml (game_id + upload_dir).
 
@@ -38,29 +36,27 @@ jobs:
 
       - name: Validate Wavedash settings
         env:
-          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}
-          WAVEDASH_GAME_ID: ${{ secrets.WAVEDASH_GAME_ID }}
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN }}
         run: |
           if [ -z "$WAVEDASH_TOKEN" ]; then
-            echo "::error::Missing WAVEDASH_TOKEN (or WAVEDASH_API_KEY) secret."
+            echo "::error::Missing WAVEDASH_TOKEN secret."
             exit 1
           fi
 
-          if [ -n "$WAVEDASH_GAME_ID" ]; then
-            sed -i "s/^game_id = .*/game_id = \"$WAVEDASH_GAME_ID\"/" wavedash.toml
+          if [ ! -f wavedash.toml ]; then
+            echo "::error::Missing wavedash.toml in repository root."
+            exit 1
           fi
 
           echo "Using wavedash.toml target:"
           cat wavedash.toml
 
-      - name: Authenticate Wavedash CLI
+      - name: Check Wavedash auth
         env:
-          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}
-        run: |
-          wavedash auth login --token "$WAVEDASH_TOKEN"
-          wavedash auth status
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN }}
+        run: wavedash auth status
 
       - name: Deploy to Wavedash
         run: wavedash build push
         env:
-          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN }}
