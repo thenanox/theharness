@@ -40,9 +40,6 @@ export class TouchControls {
     const joyY = height - margin - joyR;
     this.makeJoystick(joyX, joyY, joyR, 26);
 
-    // ── Top-right: debug toggle (backtick equivalent) ────────────────────
-    this.makeDebugButton(width - margin - 20, margin + 20);
-
     // ── Hint (fades after 8 s) ───────────────────────────────────────────
     const hint = scene.add
       .text(width / 2, joyY - joyR - 10, 'tap to fire · joystick to pump/reel', {
@@ -61,37 +58,6 @@ export class TouchControls {
       duration: 900,
       delay: 8000,
       onComplete: () => hint.destroy(),
-    });
-  }
-
-  // ── Debug toggle button (fires synthetic backtick keydown) ─────────────
-
-  private makeDebugButton(cx: number, cy: number): void {
-    const r = 18;
-    // Register its bounds as a no-fire zone so tapping it doesn't launch the rope
-    this.input.registerTouchZone(cx - r, cy - r, r * 2, r * 2);
-
-    const ring = this.scene.add
-      .circle(cx, cy, r, THEME.palette.inkDeep, 0.35)
-      .setStrokeStyle(1.5, THEME.palette.accent, 0.7)
-      .setScrollFactor(0)
-      .setDepth(1000)
-      .setInteractive({ useHandCursor: true });
-
-    const label = this.scene.add
-      .text(cx, cy, 'DBG', { fontFamily: 'monospace', fontSize: '10px', color: '#ff7a3d' })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(1001);
-
-    this.root.add([ring, label]);
-
-    ring.on('pointerdown', () => {
-      // Flash feedback
-      ring.setFillStyle(THEME.palette.accent, 0.5);
-      this.scene.time.delayedCall(100, () => ring.setFillStyle(THEME.palette.inkDeep, 0.35));
-      // Both the TuningPanel and the GameScene debug-cam listen for `keydown` on window
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '`' }));
     });
   }
 

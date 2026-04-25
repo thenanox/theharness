@@ -40,8 +40,8 @@ Challenges targeted:
 ## Play
 
 - **Production (main)**: https://thenanox.github.io/theharness/
-- itch.io: _coming soon_
-- Wavedash: _coming soon_
+- **itch.io**: https://thenanox.itch.io/the-harness
+- **Wavedash playtest**: https://wavedash.com/playtest/the-harness/39d18195-d62b-43f4-b3c7-734325d3a845
 
 ### Iteration loop — every commit is playable
 

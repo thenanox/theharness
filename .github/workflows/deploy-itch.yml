@@ -7,9 +7,11 @@ name: Deploy to itch.io
 #   BUTLER_API_KEY — get it at https://itch.io/user/settings/api-keys
 #
 # Optional repo variables:
-#   ITCH_GAME    — itch target owner/slug (default: thenanox/theharness)
+#   ITCH_GAME    — itch target owner/slug (default: thenanox/the-harness)
 #   ITCH_CHANNEL — butler channel (default: html5)
 # Create the page at https://itch.io/game/new before the first deploy.
+# After the first deploy, set the page kind to HTML and mark the html5 upload
+# as "This file will be played in the browser" in the itch.io edit page.
 
 on:
   push:
@@ -48,7 +50,7 @@ jobs:
       - name: Upload to itch.io
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-          ITCH_GAME: ${{ vars.ITCH_GAME || 'thenanox/theharness' }}
+          ITCH_GAME: ${{ vars.ITCH_GAME || 'thenanox/the-harness' }}
           ITCH_CHANNEL: ${{ vars.ITCH_CHANNEL || 'html5' }}
         run: |
           if [ -z "$BUTLER_API_KEY" ]; then

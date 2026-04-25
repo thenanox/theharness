@@ -6,7 +6,9 @@ name: Deploy to Wavedash
 # Required secret:
 #   WAVEDASH_TOKEN or WAVEDASH_API_KEY — your Wavedash API key (starts with wd_)
 #
-# Config is read from wavedash.toml (game_id + upload_dir).
+# Config is read from wavedash.toml (game_id + upload_dir + entrypoint).
+# The Wavedash CLI uploads an immutable build. Publishing/promoting that build
+# is currently done from the Wavedash Developer Portal.
 
 on:
   push:
@@ -32,7 +34,10 @@ jobs:
         # VITE_BASE defaults to './' — correct for Wavedash iframe
 
       - name: Install Wavedash CLI
-        run: curl -fsSL https://wavedash.com/cli/install.sh | sh
+        run: |
+          curl -fsSL https://wavedash.com/cli/install.sh | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/wavedash" --version
 
       - name: Validate Wavedash settings
         env:
@@ -50,6 +55,7 @@ jobs:
 
           GAME_ID=$(sed -nE 's/^game_id\s*=\s*"([^"]+)".*/\1/p' wavedash.toml | head -n 1)
           UPLOAD_DIR=$(sed -nE 's/^upload_dir\s*=\s*"([^"]+)".*/\1/p' wavedash.toml | head -n 1)
+          ENTRYPOINT=$(sed -nE 's/^entrypoint\s*=\s*"([^"]+)".*/\1/p' wavedash.toml | head -n 1)
 
           if [ -z "$GAME_ID" ]; then
             echo "::error::Missing game_id in wavedash.toml."
@@ -66,7 +72,16 @@ jobs:
             exit 1
           fi
 
+          if [ -n "$ENTRYPOINT" ] && [ ! -f "$UPLOAD_DIR/$ENTRYPOINT" ]; then
+            echo "::error::entrypoint '$ENTRYPOINT' not found inside upload_dir '$UPLOAD_DIR'."
+            exit 1
+          fi
+
           echo "Configured Wavedash game_id: $GAME_ID"
+          echo "Configured Wavedash upload_dir: $UPLOAD_DIR"
+          if [ -n "$ENTRYPOINT" ]; then
+            echo "Configured Wavedash entrypoint: $ENTRYPOINT"
+          fi
           echo "::notice::If 'wavedash build push' fails while creating the build, confirm this game_id exists in the Wavedash Developer Portal (create the game first, then copy the exact ID)."
 
           echo "Using wavedash.toml target:"
@@ -78,6 +93,6 @@ jobs:
         run: wavedash auth status
 
       - name: Deploy to Wavedash
-        run: wavedash build push
+        run: wavedash build push --message "GitHub Actions deploy ${{ github.sha }}"
         env:
           WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}

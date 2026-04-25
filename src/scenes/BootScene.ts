@@ -3,13 +3,18 @@ import { GAME_W, GAME_H } from '../config';
 import { THEME } from '../theme';
 import { AudioBus } from '../systems/AudioBus';
 import { SaveStore } from '../systems/SaveStore';
+import { Wavedash } from '../systems/WavedashAdapter';
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
-  preload(): void { AudioBus.queuePreload(this); }
+  preload(): void {
+    Wavedash.reportLoadProgress(0.1);
+    AudioBus.queuePreload(this);
+  }
 
   create(): void {
+    Wavedash.reportLoadProgress(0.35);
     this.cameras.main.setBackgroundColor(THEME.palette.screenBg);
 
     // ── CRT power-on scan line sweeping top→bottom ─────────────────────────
@@ -125,5 +130,10 @@ export class BootScene extends Phaser.Scene {
     };
     this.time.delayedCall(4000, launch);
     this.input.once('pointerdown', launch);
+
+    // Wavedash keeps the game behind its loading screen until init/loadComplete.
+    // The title prompt is playable, so this is the earliest safe ready signal.
+    Wavedash.reportLoadProgress(1);
+    Wavedash.initOnce();
   }
 }
