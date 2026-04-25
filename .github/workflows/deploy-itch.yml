@@ -34,14 +34,14 @@ jobs:
 
       - name: Install Butler
         run: |
-          BUTLER_URL=$(curl -s "https://api.github.com/repos/itchio/butler/releases/latest" \
-            | grep "browser_download_url.*linux-amd64" | cut -d'"' -f4)
-          curl -fsSL --retry 3 -L -o butler.zip "$BUTLER_URL"
+          curl -fsSL --retry 3 -L -o butler.zip \
+            "https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default"
           unzip -o butler.zip -d butler-bin
           BUTLER_BIN=$(find butler-bin -type f -name butler | head -n 1)
           chmod +x "$BUTLER_BIN"
+          export PATH="$PWD/$(dirname "$BUTLER_BIN"):$PATH"
           echo "$PWD/$(dirname "$BUTLER_BIN")" >> "$GITHUB_PATH"
-          butler -V
+          butler version
 
       - name: Upload to itch.io
         env:
