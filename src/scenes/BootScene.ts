@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../config';
 import { THEME } from '../theme';
 import { AudioBus } from '../systems/AudioBus';
+import { SaveStore } from '../systems/SaveStore';
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
@@ -91,15 +92,8 @@ export class BootScene extends Phaser.Scene {
       })
       .setOrigin(0.5).setAlpha(0);
 
-    // Best-time readout (if any). Pulled from the same key GameScene writes.
-    const bestMs = (() => {
-      try {
-        const v = localStorage.getItem('theharness.bestTimeMs.v1');
-        if (!v) return null;
-        const n = parseInt(v, 10);
-        return Number.isFinite(n) && n > 0 ? n : null;
-      } catch { return null; }
-    })();
+    // Best-time readout (if any). Pulled from the same SaveStore GameScene writes.
+    const bestMs = SaveStore.bestTimeMs();
     if (bestMs !== null) {
       const totalSec = Math.floor(bestMs / 1000);
       const m = Math.floor(totalSec / 60);

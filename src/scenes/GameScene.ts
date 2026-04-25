@@ -7,6 +7,8 @@ import { TouchControls } from '../systems/TouchControls';
 import { TuningPanel } from '../systems/TuningPanel';
 import { VisualFX } from '../systems/VisualFX';
 import { AudioBus } from '../systems/AudioBus';
+import { SaveStore } from '../systems/SaveStore';
+import { Wavedash } from '../systems/WavedashAdapter';
 import { Player } from '../entities/Player';
 import { Rope } from '../entities/Rope';
 
@@ -75,7 +77,6 @@ export class GameScene extends Phaser.Scene {
   private runElapsedMs = 0;
   private runFrozen = false;
   private timerText!: Phaser.GameObjects.Text;
-  private readonly BEST_TIME_KEY = 'theharness.bestTimeMs.v1';
 
   // After detach, block fire until all fire/detach inputs are fully released.
   private awaitingFireRelease = false;
@@ -288,6 +289,15 @@ export class GameScene extends Phaser.Scene {
     this.timerText = this.add
       .text(GAME_W - 8, 14, '00:00.00', { fontFamily: 'monospace', fontSize: '13px', color: '#3aff6a' })
       .setOrigin(1, 0).setScrollFactor(0).setDepth(200).setAlpha(0.85);
+
+    // Wavedash player name (only visible when the SDK is around — itch /
+    // Pages stay quiet). Anchored under the timer.
+    void Wavedash.getUserName().then((name) => {
+      if (!name) return;
+      this.add
+        .text(GAME_W - 8, 30, name, { fontFamily: 'monospace', fontSize: '10px', color: '#9aff60' })
+        .setOrigin(1, 0).setScrollFactor(0).setDepth(200).setAlpha(0.7);
+    });
 
     // Start run timer — ticks until win freezes it
     this.runStartTime = this.time.now;
@@ -582,9 +592,10 @@ export class GameScene extends Phaser.Scene {
     this.winTriggered = true;
     this.runFrozen = true;
     const elapsedMs = this.runElapsedMs;
-    const prevBest = this.loadBestTime();
-    const isNewBest = prevBest === null || elapsedMs < prevBest;
-    if (isNewBest) this.saveBestTime(elapsedMs);
+    const { wasBest: isNewBest, prev: prevBest } = SaveStore.recordBestTime(elapsedMs);
+
+    // Fire-and-forget leaderboard upload — no-ops on itch / Pages.
+    void Wavedash.uploadTimeScore(isNewBest ? elapsedMs : (prevBest ?? elapsedMs));
 
     this.cameras.main.shake(300, 0.012);
     this.cameras.main.flash(120, 255, 180, 80);
@@ -853,22 +864,4 @@ export class GameScene extends Phaser.Scene {
     return `${pad(m)}:${pad(s)}.${pad(cs)}`;
   }
 
-  private loadBestTime(): number | null {
-    try {
-      const v = localStorage.getItem(this.BEST_TIME_KEY);
-      if (!v) return null;
-      const n = parseInt(v, 10);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private saveBestTime(ms: number): void {
-    try {
-      localStorage.setItem(this.BEST_TIME_KEY, String(Math.round(ms)));
-    } catch {
-      // Storage unavailable (private mode / quota) — best time is ephemeral.
-    }
-  }
 }
