@@ -192,12 +192,72 @@ export class Rope {
     if (this.sm.state === 'SWINGING' && this.constraint) {
       // Scale reel speed by joystick deflection; keyboard always gives full speed (joyY = ±1).
       const reelScale = input.joyY !== 0 ? Math.abs(input.joyY) : 1;
-      const newLen = this.sm.reelLength(input.reelUp, input.reelDown, dtSeconds * reelScale);
+      const prevLen = this.sm.length;
+      let newLen = this.sm.reelLength(input.reelUp, input.reelDown, dtSeconds * reelScale);
+
+      // Tunneling guard: a Matter constraint at stiffness 1 yanks the player
+      // along the anchor line each step regardless of any platform sitting
+      // between them. If the reel would shorten the rope past the first
+      // obstacle on that line, clamp the length so the player stops *under*
+      // the platform instead of being pulled through it.
+      if (newLen < prevLen) {
+        const aw = this.sm.anchorWorld();
+        if (aw) {
+          const safeMin = this.minSafeReelLength(aw);
+          if (safeMin !== null && newLen < safeMin) {
+            newLen = Math.max(prevLen, safeMin);
+            this.sm.length = newLen;
+          }
+        }
+      }
+
       // Mutate the constraint length in place — Matter reads it next step.
       (this.constraint as unknown as { length: number }).length = newLen;
     }
 
     this.draw();
+  }
+
+  /**
+   * Lower bound for the constraint length so reeling in doesn't pull the
+   * player through a solid platform between them and the anchor.
+   *
+   * Steps a ray from player → anchor; on the first hit that isn't the
+   * player or the anchor body, returns:
+   *   distance(anchor → hit) + PLAYER_HALF
+   *
+   * Returns null when the line of sight is clear (no clamp needed).
+   */
+  private minSafeReelLength(aw: { x: number; y: number }): number | null {
+    const sx = this.player.x, sy = this.player.y;
+    const ex = aw.x, ey = aw.y;
+    const total = Math.hypot(ex - sx, ey - sy);
+    if (total < 1) return null;
+
+    const STEPS = 24;
+    const dx = (ex - sx) / STEPS;
+    const dy = (ey - sy) / STEPS;
+    const anchorBody = this.sm.anchor?.body;
+    const PLAYER_HALF = 14; // player half-height; ~half-width too (20×28 box)
+
+    // Start a couple of steps out so the player's own body doesn't register.
+    for (let i = 2; i <= STEPS - 1; i++) {
+      const px = sx + dx * i;
+      const py = sy + dy * i;
+      const bodies = (this.scene.matter as unknown as {
+        intersectPoint: (x: number, y: number) => MatterBody[];
+      }).intersectPoint(px, py);
+      for (const b of bodies) {
+        if (b === this.player.body) continue;
+        if (b.label === 'player') continue;
+        // The anchor body itself is not an "obstacle" — the rope is allowed
+        // to reel up to it.
+        if (anchorBody && b === anchorBody) continue;
+        const distAnchorToHit = Math.hypot(ex - px, ey - py);
+        return distAnchorToHit + PLAYER_HALF;
+      }
+    }
+    return null;
   }
 
   private draw(): void {
