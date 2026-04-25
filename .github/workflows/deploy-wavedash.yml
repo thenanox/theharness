@@ -34,7 +34,14 @@ jobs:
       - name: Install Wavedash CLI
         run: curl -fsSL https://wavedash.com/cli/install.sh | sh
 
+      - name: Authenticate Wavedash CLI
+        env:
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}
+        run: |
+          wavedash auth login --token "$WAVEDASH_TOKEN"
+          wavedash auth status
+
       - name: Deploy to Wavedash
         run: wavedash build push
         env:
-          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_API_KEY }}
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}

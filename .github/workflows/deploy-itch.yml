@@ -37,10 +37,13 @@ jobs:
           BUTLER_URL=$(curl -s "https://api.github.com/repos/itchio/butler/releases/latest" \
             | grep "browser_download_url.*linux-amd64" | cut -d'"' -f4)
           curl -fsSL --retry 3 -L -o butler.zip "$BUTLER_URL"
-          unzip -o butler.zip
-          chmod +x butler
+          unzip -o butler.zip -d butler-bin
+          BUTLER_BIN=$(find butler-bin -type f -name butler | head -n 1)
+          chmod +x "$BUTLER_BIN"
+          echo "$PWD/$(dirname "$BUTLER_BIN")" >> "$GITHUB_PATH"
+          butler -V
 
       - name: Upload to itch.io
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-        run: ./butler push dist/ thenanox/the-harness:html5 --userversion "${{ github.sha }}"
+        run: butler push dist/ thenanox/the-harness:html5 --userversion "${{ github.sha }}"
