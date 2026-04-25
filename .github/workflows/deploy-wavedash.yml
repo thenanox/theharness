@@ -32,10 +32,7 @@ jobs:
         # VITE_BASE defaults to './' — correct for Wavedash iframe
 
       - name: Install Wavedash CLI
-        run: |
-          curl --proto '=https' --tlsv1.2 -LsSf \
-            https://github.com/wvdsh/cli/releases/latest/download/wavedash-installer.sh | sh
-          wavedash --version
+        run: curl -fsSL https://wavedash.com/cli/install.sh | sh
 
       - name: Validate Wavedash settings
         env:
@@ -50,6 +47,27 @@ jobs:
             echo "::error::Missing wavedash.toml in repository root."
             exit 1
           fi
+
+          GAME_ID=$(sed -nE 's/^game_id\s*=\s*"([^"]+)".*/\1/p' wavedash.toml | head -n 1)
+          UPLOAD_DIR=$(sed -nE 's/^upload_dir\s*=\s*"([^"]+)".*/\1/p' wavedash.toml | head -n 1)
+
+          if [ -z "$GAME_ID" ]; then
+            echo "::error::Missing game_id in wavedash.toml."
+            exit 1
+          fi
+
+          if [ -z "$UPLOAD_DIR" ]; then
+            echo "::error::Missing upload_dir in wavedash.toml."
+            exit 1
+          fi
+
+          if [ ! -d "$UPLOAD_DIR" ]; then
+            echo "::error::upload_dir '$UPLOAD_DIR' not found. Ensure the build step generated it."
+            exit 1
+          fi
+
+          echo "Configured Wavedash game_id: $GAME_ID"
+          echo "::notice::If 'wavedash build push' fails while creating the build, confirm this game_id exists in the Wavedash Developer Portal (create the game first, then copy the exact ID)."
 
           echo "Using wavedash.toml target:"
           cat wavedash.toml
