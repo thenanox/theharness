@@ -107,7 +107,8 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, W / 2, spawnY);
     this.rope   = new Rope(this, this.player, this.fx);
 
-    // Rope events → camera shake + zoom
+    // Rope events → camera shake + zoom + SFX
+    this.events.on('rope-fire', () => { AudioBus.playSfx('ropeFire'); });
     this.events.on('rope-attach', () => {
       this.triggerShake(45, 0.003);
       this.tweens.add({
@@ -120,6 +121,7 @@ export class GameScene extends Phaser.Scene {
       }).engine;
       engine.timing.timeScale = 0;
       this.time.delayedCall(40, () => { engine.timing.timeScale = 1; });
+      AudioBus.playSfx('ropeAttach');
     });
     this.events.on('rope-detach', () => { this.triggerShake(55, 0.0035); });
 
@@ -308,7 +310,11 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 1).setAlpha(0.45).setScrollFactor(0).setDepth(200);
     this.tweens.add({ targets: hint, alpha: 0, duration: 900, delay: 12000, onComplete: () => hint.destroy() });
 
-    this.input.once('pointerdown', () => { AudioBus.startIfLoaded(this); AudioBus.duck(this, 0.6); });
+    this.input.once('pointerdown', () => {
+      AudioBus.unlock();
+      AudioBus.startMusic(this, 'game');
+      AudioBus.duck(this, 0.6);
+    });
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -600,6 +606,12 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(300, 0.012);
     this.cameras.main.flash(120, 255, 180, 80);
 
+    // Audio: lift the gameplay duck first so the new track starts at full
+    // volume, then ring out the celebrate fanfare and start the win loop.
+    AudioBus.unduck(this);
+    AudioBus.playSfx('celebrate');
+    AudioBus.startMusic(this, 'win');
+
     this.time.delayedCall(120, () => {
       this.cameras.main.zoomTo(1.08, 400, 'Sine.easeOut');
       for (let i = 0; i < 3; i++) {
@@ -684,10 +696,18 @@ export class GameScene extends Phaser.Scene {
       duration: 600, delay: 500, ease: 'Sine.easeOut',
     });
 
-    // Enable restart. Keyboard R or a tap on the hint / panel restarts the scene.
+    // Enable restart. Keyboard R or *any* pointerdown anywhere on screen
+    // restarts — the hint text is too small to be a reliable mobile target,
+    // and TouchControls / aim taps are blocked because winTriggered=true.
+    // We delay the global listener by 700 ms so the touch that triggered the
+    // win itself doesn't immediately restart, and only attach it once the
+    // hint has had time to fade in.
     const restart = () => this.scene.restart();
     this.input.keyboard?.once('keydown-R', restart);
-    hint.setInteractive({ useHandCursor: true }).once('pointerdown', restart);
+    this.time.delayedCall(700, () => {
+      this.input.once('pointerdown', restart);
+    });
+    hint.setInteractive({ useHandCursor: true });
   }
 
   // ── Main loop ─────────────────────────────────────────────────────────────

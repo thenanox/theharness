@@ -80,6 +80,9 @@ export class Rope {
     const dist = Math.hypot(dx, dy);
     if (dist < 1) return;
 
+    // Cable whip — heard the moment the hook leaves your hand.
+    this.scene.events.emit('rope-fire');
+
     const nx = dx / dist;
     const ny = dy / dist;
     const ex = sx + nx * TUNING.maxLength;

@@ -14,7 +14,7 @@ const DEFS: Def[] = [
   { key: 'swingPump',        label: 'Swing pump',     min: 0.0001, max: 0.006, step: 0.0001 },
   { key: 'reelSpeed',        label: 'Reel speed',     min: 20,  max: 500,   step: 10    },
   { key: 'maxLength',        label: 'Rope max',       min: 80,  max: 500,   step: 10    },
-  { key: 'maxSpeed',         label: 'Max speed',      min: 2,   max: 25,    step: 1     },
+  { key: 'maxSpeed',         label: 'Max speed',      min: 2,   max: 23,    step: 1     },
   { key: 'floorFriction',    label: 'Floor friction', min: 0.50, max: 1.00,  step: 0.01  },
   { key: 'slideThreshold',   label: 'Stun thresh',    min: 0.5, max: 8,     step: 0.5   },
   { key: 'slideMinDuration', label: 'Stun ms',        min: 0,   max: 3000,  step: 50    },
