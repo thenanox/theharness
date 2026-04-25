@@ -14,7 +14,7 @@ const DEFS: Def[] = [
   { key: 'swingPump',        label: 'Swing pump',     min: 0.0001, max: 0.006, step: 0.0001 },
   { key: 'reelSpeed',        label: 'Reel speed',     min: 20,  max: 500,   step: 10    },
   { key: 'maxLength',        label: 'Rope max',       min: 80,  max: 500,   step: 10    },
-  { key: 'maxSpeed',         label: 'Max speed',      min: 2,   max: 25,    step: 1     },
+  { key: 'maxSpeed',         label: 'Max speed',      min: 2,   max: 23,    step: 1     },
   { key: 'floorFriction',    label: 'Floor friction', min: 0.50, max: 1.00,  step: 0.01  },
   { key: 'slideThreshold',   label: 'Stun thresh',    min: 0.5, max: 8,     step: 0.5   },
   { key: 'slideMinDuration', label: 'Stun ms',        min: 0,   max: 3000,  step: 50    },
@@ -32,7 +32,15 @@ export class TuningPanel {
   private inputs: Map<string, HTMLInputElement> = new Map();
 
   constructor() {
+    // Idempotent: on scene restart we want to reuse the existing panel
+    // rather than stack a new DOM node + duplicate keydown listener.
+    const existing = document.getElementById('harness-tuning-panel') as HTMLDivElement | null;
+    if (existing) {
+      this.el = existing;
+      return;
+    }
     this.el = document.createElement('div');
+    this.el.id = 'harness-tuning-panel';
     this.el.style.cssText =
       'position:fixed;top:4px;right:4px;z-index:10000;' +
       'background:rgba(0,0,0,0.88);color:#3aff6a;font:11px/1.5 monospace;' +

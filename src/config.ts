@@ -19,6 +19,8 @@ export const TOWER_H = 5000;
 //
 // TUNNELING PREVENTION: maxSpeed must be less than the thinnest wall (24px).
 // Platform thickness in GameScene is 24px; side-walls/floor are 32px.
+// 20 leaves a 4px safety margin and is the highest value the climb tolerates
+// without skipping through ledges between Matter steps.
 export const PHYSICS = {
   gravityY: 0.50,
   positionIterations: 14,
@@ -30,7 +32,7 @@ export const PHYSICS = {
     frictionAir: 0.010,
     friction: 0,
     restitution: 0.0,
-    maxSpeed: 5,
+    maxSpeed: 20,
     slideThreshold: 1.0,
     slideMinDuration: 200,
     floorFriction: 0.98,

@@ -7,6 +7,9 @@ import { TouchControls } from '../systems/TouchControls';
 import { TuningPanel } from '../systems/TuningPanel';
 import { VisualFX } from '../systems/VisualFX';
 import { AudioBus } from '../systems/AudioBus';
+import { SaveStore } from '../systems/SaveStore';
+import { Wavedash } from '../systems/WavedashAdapter';
+import { IS_DEBUG } from '../flags';
 import { Player } from '../entities/Player';
 import { Rope } from '../entities/Rope';
 
@@ -70,6 +73,12 @@ export class GameScene extends Phaser.Scene {
   // Win state
   private winTriggered = false;
 
+  // Run timer (frozen on win so the final panel shows the winning time)
+  private runStartTime = 0;
+  private runElapsedMs = 0;
+  private runFrozen = false;
+  private timerText!: Phaser.GameObjects.Text;
+
   // After detach, block fire until all fire/detach inputs are fully released.
   private awaitingFireRelease = false;
 
@@ -86,7 +95,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setZoom(GAME_W / WORLD_W);
     this.cameras.main.setBackgroundColor(THEME.palette.screenBg);
     this.matter.world.setGravity(0, TUNING.gravityY);
-    new TuningPanel();
+    if (IS_DEBUG) new TuningPanel();
     this.matter.world.setBounds(0, -200, W, H + 200);
 
     this.fx = new VisualFX(this);
@@ -99,7 +108,8 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, W / 2, spawnY);
     this.rope   = new Rope(this, this.player, this.fx);
 
-    // Rope events → camera shake + zoom
+    // Rope events → camera shake + zoom + SFX
+    this.events.on('rope-fire', () => { AudioBus.playSfx('ropeFire'); });
     this.events.on('rope-attach', () => {
       this.triggerShake(45, 0.003);
       this.tweens.add({
@@ -112,6 +122,7 @@ export class GameScene extends Phaser.Scene {
       }).engine;
       engine.timing.timeScale = 0;
       this.time.delayedCall(40, () => { engine.timing.timeScale = 1; });
+      AudioBus.playSfx('ropeAttach');
     });
     this.events.on('rope-detach', () => { this.triggerShake(55, 0.0035); });
 
@@ -134,18 +145,20 @@ export class GameScene extends Phaser.Scene {
     const matterEngine = (this.matter.world as unknown as {
       engine: { timing: { timeScale: number } };
     }).engine;
-    window.addEventListener('keydown', (e) => {
-      if (e.key !== '`') return;
-      this.debugCam = !this.debugCam;
-      if (this.debugCam) {
-        this.cameras.main.stopFollow();
-        matterEngine.timing.timeScale = 0;
-      } else {
-        this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
-        this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
-        matterEngine.timing.timeScale = 1;
-      }
-    });
+    if (IS_DEBUG) {
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== '`') return;
+        this.debugCam = !this.debugCam;
+        if (this.debugCam) {
+          this.cameras.main.stopFollow();
+          matterEngine.timing.timeScale = 0;
+        } else {
+          this.cameras.main.startFollow(this.player.gfx, true, 0.12, 0.12);
+          this.cameras.main.setFollowOffset(0, GAME_H * 0.22);
+          matterEngine.timing.timeScale = 1;
+        }
+      });
+    }
 
     this.fx.paintScanlines(GAME_W, GAME_H);
     this.fx.paintBottomFog(GAME_W, GAME_H);
@@ -270,15 +283,34 @@ export class GameScene extends Phaser.Scene {
     );
 
     // ── HUD ───────────────────────────────────────────────────────────────
+    // FPS / rope-state readout: debug only.
     this.hudText = this.add
       .text(8, 8, '', { fontFamily: 'monospace', fontSize: '11px', color: '#3aff6a' })
-      .setScrollFactor(0).setDepth(200).setAlpha(0.5);
+      .setScrollFactor(0).setDepth(200).setAlpha(0.5)
+      .setVisible(IS_DEBUG);
+
+    // Mute toggle — top-left corner. Driven by SaveStore so it sticks.
+    this.buildMuteButton();
 
     this.heightText = this.add
       .text(GAME_W / 2, 14, '', { fontFamily: 'monospace', fontSize: '15px', color: '#ff7a3d' })
       .setOrigin(0.5, 0).setScrollFactor(0).setDepth(200);
 
+    this.timerText = this.add
+      .text(GAME_W - 8, 14, '00:00.00', { fontFamily: 'monospace', fontSize: '13px', color: '#3aff6a' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(200).setAlpha(0.85);
 
+    // Wavedash player name (only visible when the SDK is around — itch /
+    // Pages stay quiet). Anchored under the timer.
+    void Wavedash.getUserName().then((name) => {
+      if (!name) return;
+      this.add
+        .text(GAME_W - 8, 30, name, { fontFamily: 'monospace', fontSize: '10px', color: '#9aff60' })
+        .setOrigin(1, 0).setScrollFactor(0).setDepth(200).setAlpha(0.7);
+    });
+
+    // Start run timer — ticks until win freezes it
+    this.runStartTime = this.time.now;
 
     const hint = this.add
       .text(GAME_W / 2, GAME_H - 28, 'Click to fire · SPACE fire/detach · W/S reel · tap to fire on mobile',
@@ -286,7 +318,11 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 1).setAlpha(0.45).setScrollFactor(0).setDepth(200);
     this.tweens.add({ targets: hint, alpha: 0, duration: 900, delay: 12000, onComplete: () => hint.destroy() });
 
-    this.input.once('pointerdown', () => { AudioBus.startIfLoaded(this); AudioBus.duck(this, 0.6); });
+    this.input.once('pointerdown', () => {
+      AudioBus.unlock();
+      AudioBus.startMusic(this, 'game');
+      AudioBus.duck(this, 0.6);
+    });
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -444,6 +480,12 @@ export class GameScene extends Phaser.Scene {
     slab(W * 0.42, 830, T, 80, THEME.palette.ice,   707);
     slab(W * 0.58, 830, T, 80, THEME.palette.ice,   709);
 
+    // Center relay — 60×24, sits in the 78px gap between the piston tops
+    // (W*0.42 inner edge ≈ 281, W*0.58 inner edge ≈ 359) and 60px above
+    // them. Breaks up the diagonal piston → far-side stepping-stone swing
+    // that was the meanest jump in Core.
+    slab(W * 0.50, 730, 60, T, THEME.palette.moss,  706);
+
     // Stepping stones
     slab(W * 0.22, 710, 40, T, THEME.palette.stone, 711);
     slab(W * 0.80, 600, 40, T, THEME.palette.stone, 713);
@@ -568,8 +610,21 @@ export class GameScene extends Phaser.Scene {
 
   private playWinSequence(): void {
     this.winTriggered = true;
+    this.runFrozen = true;
+    const elapsedMs = this.runElapsedMs;
+    const { wasBest: isNewBest, prev: prevBest } = SaveStore.recordBestTime(elapsedMs);
+
+    // Fire-and-forget leaderboard upload — no-ops on itch / Pages.
+    void Wavedash.uploadTimeScore(isNewBest ? elapsedMs : (prevBest ?? elapsedMs));
+
     this.cameras.main.shake(300, 0.012);
     this.cameras.main.flash(120, 255, 180, 80);
+
+    // Audio: lift the gameplay duck first so the new track starts at full
+    // volume, then ring out the celebrate fanfare and start the win loop.
+    AudioBus.unduck(this);
+    AudioBus.playSfx('celebrate');
+    AudioBus.startMusic(this, 'win');
 
     this.time.delayedCall(120, () => {
       this.cameras.main.zoomTo(1.08, 400, 'Sine.easeOut');
@@ -586,14 +641,87 @@ export class GameScene extends Phaser.Scene {
       this.fx.steamPuff(GAME_W * 0.75, 60);
     });
 
-    this.time.delayedCall(1800, () => {
-      const banner = this.add.text(GAME_W / 2, GAME_H / 2 - 30, THEME.labels.winBanner, {
-        fontFamily: 'ui-serif, Georgia, serif', fontSize: '42px', color: '#ff7a3d',
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(9998).setAlpha(0);
-      this.tweens.add({ targets: banner, alpha: 1, duration: 600, ease: 'Sine.easeOut' });
+    // Ignition gauge dial sweep — machine-themed finale
+    this.time.delayedCall(1400, () => {
+      this.fx.playIgnitionFinale(GAME_W / 2, GAME_H * 0.42, GAME_W, GAME_H, () => {
+        this.showVictoryPanel(elapsedMs, prevBest, isNewBest);
+      });
     });
 
     this.time.delayedCall(2000, () => { this.cameras.main.zoomTo(1.0, 600); });
+  }
+
+  private showVictoryPanel(elapsedMs: number, prevBest: number | null, isNewBest: boolean): void {
+    const cx = GAME_W / 2;
+    const panelY = GAME_H * 0.68;
+
+    const banner = this.add.text(cx, GAME_H * 0.22, THEME.labels.winBanner, {
+      fontFamily: 'ui-serif, Georgia, serif', fontSize: '34px', color: '#ff7a3d',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(9998).setAlpha(0);
+    this.tweens.add({ targets: banner, alpha: 1, y: GAME_H * 0.2, duration: 500, ease: 'Sine.easeOut' });
+
+    // Stat panel: RUN + BEST, gauge-panel styling
+    const timeStr = GameScene.formatTime(elapsedMs);
+    const bestMs = isNewBest ? elapsedMs : prevBest ?? elapsedMs;
+    const bestStr = GameScene.formatTime(bestMs);
+
+    const panel = this.add.graphics().setScrollFactor(0).setDepth(9998).setAlpha(0);
+    panel.fillStyle(0x15171c, 0.92);
+    panel.fillRoundedRect(cx - 110, panelY - 44, 220, 94, 6);
+    panel.lineStyle(1.5, THEME.palette.ember, 0.9);
+    panel.strokeRoundedRect(cx - 110, panelY - 44, 220, 94, 6);
+    panel.lineStyle(1, 0xffffff, 0.2);
+    panel.lineBetween(cx - 100, panelY + 2, cx + 100, panelY + 2);
+
+    const runLabel = this.add.text(cx - 96, panelY - 32, 'RUN',
+      { fontFamily: 'monospace', fontSize: '10px', color: '#9aff60' })
+      .setScrollFactor(0).setDepth(9999).setAlpha(0);
+    const runTime = this.add.text(cx + 96, panelY - 32, timeStr,
+      { fontFamily: 'monospace', fontSize: '20px', color: '#fff5c0' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(9999).setAlpha(0);
+
+    const bestLabel = this.add.text(cx - 96, panelY + 10, isNewBest ? 'NEW BEST' : 'BEST',
+      { fontFamily: 'monospace', fontSize: '10px', color: isNewBest ? '#ff7a3d' : '#9aff60' })
+      .setScrollFactor(0).setDepth(9999).setAlpha(0);
+    const bestTime = this.add.text(cx + 96, panelY + 10, bestStr,
+      { fontFamily: 'monospace', fontSize: '18px', color: isNewBest ? '#ff7a3d' : '#ffe060' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(9999).setAlpha(0);
+
+    this.tweens.add({
+      targets: [panel, runLabel, runTime, bestLabel, bestTime],
+      alpha: 1, duration: 450, ease: 'Sine.easeOut',
+    });
+
+    // New best gets a little pulse on the value
+    if (isNewBest) {
+      this.tweens.add({
+        targets: bestTime, scale: { from: 1, to: 1.08 },
+        duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+    }
+
+    // Restart hint
+    const hint = this.add.text(cx, GAME_H - 36,
+      'press  R  to climb again',
+      { fontFamily: 'monospace', fontSize: '12px', color: '#ff7a3d' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(9999).setAlpha(0);
+    this.tweens.add({
+      targets: hint, alpha: { from: 0, to: 0.9 },
+      duration: 600, delay: 500, ease: 'Sine.easeOut',
+    });
+
+    // Enable restart. Keyboard R or *any* pointerdown anywhere on screen
+    // restarts — the hint text is too small to be a reliable mobile target,
+    // and TouchControls / aim taps are blocked because winTriggered=true.
+    // We delay the global listener by 700 ms so the touch that triggered the
+    // win itself doesn't immediately restart, and only attach it once the
+    // hint has had time to fade in.
+    const restart = () => this.scene.restart();
+    this.input.keyboard?.once('keydown-R', restart);
+    this.time.delayedCall(700, () => {
+      this.input.once('pointerdown', restart);
+    });
+    hint.setInteractive({ useHandCursor: true });
   }
 
   // ── Main loop ─────────────────────────────────────────────────────────────
@@ -742,10 +870,119 @@ export class GameScene extends Phaser.Scene {
     this.heightText.setText(metersLeft > 0 ? `${metersLeft} m` : 'CLIMB!');
     this.heightText.setColor(this.phosphorColor > 0x888800 ? '#ff7a3d' : `#${this.phosphorColor.toString(16).padStart(6, '0')}`);
 
-    this.hudText.setText(
-      `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${this.player.isSliding() ? '  SLIDING' : ''}`,
-    );
+    if (IS_DEBUG) {
+      this.hudText.setText(
+        `fps ${Math.round(this.game.loop.actualFps)}  rope ${this.rope.state}${this.player.isSliding() ? '  SLIDING' : ''}`,
+      );
+    }
+
+    // ── Run timer ─────────────────────────────────────────────────────────
+    if (!this.runFrozen) {
+      this.runElapsedMs = this.time.now - this.runStartTime;
+    }
+    this.timerText.setText(GameScene.formatTime(this.runElapsedMs));
+    // Tint with current phosphor, ember once the Core is near
+    const hex = `#${this.phosphorColor.toString(16).padStart(6, '0')}`;
+    this.timerText.setColor(this.coreProximity > 0.5 ? '#ff7a3d' : hex);
 
     this.input2.clearOneShots();
   }
+
+  // ── Mute button ────────────────────────────────────────────────────────
+
+  /**
+   * Top-left mute toggle. The button lives in HUD space (scroll-locked,
+   * depth 200) and reads/writes its state through SaveStore so the
+   * preference sticks across runs and across scene restarts.
+   *
+   * The icon is a tiny speaker drawn programmatically — no glyph fonts /
+   * emoji to fail on. When muted, the speaker is dimmed and a diagonal
+   * line crosses it.
+   */
+  private buildMuteButton(): void {
+    // Sync AudioBus to the persisted preference *before* anything plays.
+    AudioBus.setMuted(SaveStore.isMuted());
+
+    const cx = 18, cy = 18;       // button center, top-left corner
+    const size = 32;              // hit area edge
+
+    // Register with InputController so taps here don't fire the rope.
+    this.input2.registerTouchZone(cx - size / 2, cy - size / 2, size, size);
+
+    const hit = this.add
+      .rectangle(cx, cy, size, size, 0x000000, 0.0)
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(199)
+      .setInteractive({ useHandCursor: true });
+
+    const icon = this.add
+      .graphics()
+      .setScrollFactor(0)
+      .setDepth(200);
+
+    const draw = () => {
+      const muted = SaveStore.isMuted();
+      const color = muted ? 0x636572 : 0x3aff6a;
+      const alpha = muted ? 0.6 : 0.9;
+      icon.clear();
+      // Backplate
+      icon.fillStyle(0x15171c, 0.55);
+      icon.fillRoundedRect(cx - size / 2, cy - size / 2, size, size, 4);
+      icon.lineStyle(1, color, alpha * 0.5);
+      icon.strokeRoundedRect(cx - size / 2, cy - size / 2, size, size, 4);
+
+      // Speaker box (left rectangle)
+      icon.fillStyle(color, alpha);
+      icon.fillRect(cx - 8, cy - 3, 4, 6);
+      // Speaker horn (trapezoid)
+      icon.beginPath();
+      icon.moveTo(cx - 4, cy - 3);
+      icon.lineTo(cx + 1, cy - 7);
+      icon.lineTo(cx + 1, cy + 7);
+      icon.lineTo(cx - 4, cy + 3);
+      icon.closePath();
+      icon.fillPath();
+
+      if (!muted) {
+        // Sound waves
+        icon.lineStyle(1.2, color, alpha);
+        icon.beginPath();
+        icon.arc(cx + 3, cy, 3, -Math.PI / 3, Math.PI / 3, false);
+        icon.strokePath();
+        icon.beginPath();
+        icon.arc(cx + 3, cy, 6, -Math.PI / 3, Math.PI / 3, false);
+        icon.strokePath();
+      } else {
+        // Diagonal strike
+        icon.lineStyle(1.5, 0xff5040, 0.9);
+        icon.lineBetween(cx - 8, cy - 8, cx + 8, cy + 8);
+      }
+    };
+    draw();
+
+    hit.on('pointerdown', (pointer: Phaser.Input.Pointer, _x: number, _y: number, evt: Phaser.Types.Input.EventData) => {
+      const muted = !SaveStore.isMuted();
+      SaveStore.setMuted(muted);
+      AudioBus.unlock();          // first click also unlocks the audio context
+      AudioBus.setMuted(muted);
+      draw();
+      // Don't let this tap also trigger rope fire / restart on the win screen.
+      evt.stopPropagation();
+      void pointer;
+    });
+  }
+
+  // ── Time helpers / persistence ────────────────────────────────────────────
+
+  private static formatTime(ms: number): string {
+    const clamped = Math.max(0, ms);
+    const totalSec = Math.floor(clamped / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    const cs = Math.floor((clamped % 1000) / 10);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(m)}:${pad(s)}.${pad(cs)}`;
+  }
+
 }

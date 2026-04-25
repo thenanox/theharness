@@ -83,6 +83,39 @@ export class VisualFX {
     const isFloor = w > h * 4;       // very wide low → floor / ceiling
     const r = Math.min(w, h) * 0.12;
 
+    // ── 0. Solid body fill (makes the slab feel like forged metal, not
+    //     a translucent phosphor rectangle). Two-tone: darker base + a
+    //     slightly brighter inner panel, plus an orientation-aware streak
+    //     to suggest rolled plate / brushed finish.
+    // ────────────────────────────────────────────────────────────────────
+    g.fillStyle(0x15171c, 1.0);
+    g.fillRoundedRect(-hx, -hy, w, h, r);
+
+    // Inner panel (inset by ~3px) for a recessed plate look
+    if (w > 10 && h > 10) {
+      const inset = 3;
+      g.fillStyle(0x1d2128, 1.0);
+      g.fillRoundedRect(-hx + inset, -hy + inset, w - inset * 2, h - inset * 2, Math.max(0, r - inset));
+    }
+
+    // Brushed streaks across the dominant axis (very subtle)
+    g.lineStyle(1, 0x262a32, 0.55);
+    if (isWall) {
+      // Vertical brushed streaks inside the plate
+      const streaks = Math.max(1, Math.floor(w / 10));
+      for (let i = 1; i < streaks; i++) {
+        const sx = -hx + (w * i) / streaks;
+        g.lineBetween(sx, -hy + 5, sx, hy - 5);
+      }
+    } else {
+      // Horizontal brushed streaks inside the plate
+      const streaks = Math.max(1, Math.floor(h / 6));
+      for (let i = 1; i < streaks; i++) {
+        const sy = -hy + (h * i) / streaks;
+        g.lineBetween(-hx + 5, sy, hx - 5, sy);
+      }
+    }
+
     // ── 1. Soft glow pass (behind everything) ────────────────────────────
     g.lineStyle(6, 0xffffff, 0.10);
     g.strokeRoundedRect(-hx, -hy, w, h, r);
@@ -974,6 +1007,131 @@ export class VisualFX {
     this.scene.tweens.add({
       targets: veil, alpha: { from: 0, to: 1 }, duration: 1800,
       ease: 'Cubic.easeInOut', onComplete: () => { if (onDone) onDone(); },
+    });
+  }
+
+  // ── Ignition finale (machine-themed victory burst) ──────────────────────
+  //
+  // Big central gauge-dial whose needle sweeps from 0 → MAX, then at max it
+  // triggers concentric ignition rings exploding outward, plus steam puffs
+  // from all four viewport corners. All content is screen-locked (depth
+  // 9997, above the reveal veil stays below the final banner at 9998+).
+  //
+  // Calls `onMax` when the needle finishes its sweep, so callers can time
+  // the banner / stats to the combustion beat.
+
+  playIgnitionFinale(
+    cx: number, cy: number, viewportW: number, viewportH: number,
+    onMax?: () => void,
+  ): void {
+    const scene = this.scene;
+
+    // Dial plate (behind everything in the finale stack)
+    const dial = scene.add.graphics().setScrollFactor(0).setDepth(9997);
+    const R = 72; // outer radius
+    const rInner = 52;
+
+    // Back plate — dark disc + brass rim
+    dial.fillStyle(0x15171c, 0.92);
+    dial.fillCircle(cx, cy, R + 6);
+    dial.lineStyle(2, THEME.palette.ember, 0.85);
+    dial.strokeCircle(cx, cy, R + 6);
+    dial.lineStyle(1, 0xffffff, 0.35);
+    dial.strokeCircle(cx, cy, R);
+    // Tick marks around the arc (−120° → +120°, bottom skipped)
+    const tickStart = -Math.PI * 1.15;
+    const tickEnd   =  Math.PI * 0.15;
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12;
+      const ang = tickStart + (tickEnd - tickStart) * t;
+      const long = i % 3 === 0;
+      const r0 = rInner + (long ? 2 : 8);
+      const r1 = R - 4;
+      dial.lineStyle(long ? 1.5 : 1, 0xffffff, long ? 0.85 : 0.5);
+      dial.lineBetween(
+        cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0,
+        cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1,
+      );
+    }
+    // Hub
+    dial.fillStyle(THEME.palette.ember, 1);
+    dial.fillCircle(cx, cy, 5);
+    dial.fillStyle(0xffffff, 0.8);
+    dial.fillCircle(cx, cy, 2);
+    // Label strip above hub
+    const label = scene.add.text(cx, cy + 18, 'IGNITION', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ff7a3d',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(9997).setAlpha(0.85);
+
+    // Fade the whole dial in
+    dial.setAlpha(0);
+    label.setAlpha(0);
+    scene.tweens.add({
+      targets: [dial, label], alpha: { from: 0, to: 1 },
+      duration: 320, ease: 'Sine.easeOut',
+    });
+
+    // Needle — swings from tickStart to tickEnd over 1200ms
+    const needle = scene.add.graphics().setScrollFactor(0).setDepth(9998);
+    const angleObj = { a: tickStart };
+    const drawNeedle = () => {
+      needle.clear();
+      // Shadow
+      needle.lineStyle(3, 0x000000, 0.35);
+      needle.lineBetween(cx, cy, cx + Math.cos(angleObj.a) * (R - 10), cy + Math.sin(angleObj.a) * (R - 10));
+      // Core
+      needle.lineStyle(1.5, 0xffffff, 1);
+      needle.lineBetween(cx, cy, cx + Math.cos(angleObj.a) * (R - 10), cy + Math.sin(angleObj.a) * (R - 10));
+      // Hot tip
+      needle.fillStyle(THEME.palette.ember, 1);
+      needle.fillCircle(cx + Math.cos(angleObj.a) * (R - 10), cy + Math.sin(angleObj.a) * (R - 10), 2.5);
+    };
+    drawNeedle();
+    scene.tweens.add({
+      targets: angleObj, a: tickEnd,
+      duration: 1200, ease: 'Cubic.easeIn',
+      onUpdate: drawNeedle,
+      onComplete: () => {
+        // ── MAX hit: ignition rings + full-screen ember flash
+        const cam = scene.cameras.main;
+        cam.shake(260, 0.014);
+        cam.flash(180, 255, 200, 120);
+
+        // Concentric ignition rings
+        for (let i = 0; i < 4; i++) {
+          const ring = scene.add.graphics().setScrollFactor(0).setDepth(9998);
+          ring.lineStyle(3, THEME.palette.ember, 0.9);
+          ring.strokeCircle(cx, cy, 10);
+          ring.setBlendMode(Phaser.BlendModes.ADD);
+          const maxR = Math.hypot(viewportW, viewportH) * 0.7;
+          scene.tweens.add({
+            targets: ring, scale: { from: 1, to: maxR / 10 }, alpha: { from: 1, to: 0 },
+            duration: 900 + i * 120, delay: i * 90, ease: 'Cubic.easeOut',
+            onComplete: () => ring.destroy(),
+          });
+        }
+
+        // Steam puffs from the four corners + top midpoint
+        const puffs: Array<[number, number]> = [
+          [viewportW * 0.12, viewportH * 0.18],
+          [viewportW * 0.88, viewportH * 0.18],
+          [viewportW * 0.12, viewportH * 0.82],
+          [viewportW * 0.88, viewportH * 0.82],
+          [viewportW * 0.50, viewportH * 0.10],
+        ];
+        for (const [px, py] of puffs) {
+          this.steamPuff(px, py);
+        }
+
+        // Needle holds at max and heats up
+        needle.setBlendMode(Phaser.BlendModes.ADD);
+        scene.tweens.add({
+          targets: needle, alpha: { from: 1, to: 0.55 },
+          duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        });
+
+        if (onMax) onMax();
+      },
     });
   }
 

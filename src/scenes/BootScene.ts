@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../config';
 import { THEME } from '../theme';
 import { AudioBus } from '../systems/AudioBus';
+import { SaveStore } from '../systems/SaveStore';
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
@@ -90,6 +91,23 @@ export class BootScene extends Phaser.Scene {
         color: `#${THEME.palette.phosphorBase.toString(16).padStart(6, '0')}`,
       })
       .setOrigin(0.5).setAlpha(0);
+
+    // Best-time readout (if any). Pulled from the same SaveStore GameScene writes.
+    const bestMs = SaveStore.bestTimeMs();
+    if (bestMs !== null) {
+      const totalSec = Math.floor(bestMs / 1000);
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      const cs = Math.floor((bestMs % 1000) / 10);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const bestStr = `BEST  ${pad(m)}:${pad(s)}.${pad(cs)}`;
+      const bestText = this.add
+        .text(GAME_W / 2, GAME_H / 2 + 96, bestStr, {
+          fontFamily: 'monospace', fontSize: '11px', color: '#ff7a3d',
+        })
+        .setOrigin(0.5).setAlpha(0);
+      this.tweens.add({ targets: bestText, alpha: 0.8, duration: 500, delay: 800 });
+    }
     this.tweens.add({
       targets: prompt, alpha: { from: 0, to: 0.7 }, duration: 500, delay: 600,
       onComplete: () => {
