@@ -61,5 +61,17 @@ jobs:
             exit 1
           fi
 
+          if ! echo "$ITCH_GAME" | grep -Eq '^[^/]+/[^/]+$'; then
+            echo "::error::ITCH_GAME must be in owner/slug format (current: '$ITCH_GAME')."
+            exit 1
+          fi
+
+          echo "Checking itch.io game target: $ITCH_GAME"
+          if ! butler status "$ITCH_GAME"; then
+            echo "::error::Unable to access itch.io game '$ITCH_GAME'."
+            echo "::error::Confirm the game exists (https://itch.io/game/new), the slug matches, and the API key has access."
+            exit 1
+          fi
+
           echo "Uploading dist/ to $ITCH_GAME:$ITCH_CHANNEL"
           butler push dist/ "$ITCH_GAME:$ITCH_CHANNEL" --userversion "${{ github.sha }}"

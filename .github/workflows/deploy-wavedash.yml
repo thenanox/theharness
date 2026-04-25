@@ -32,7 +32,10 @@ jobs:
         # VITE_BASE defaults to './' — correct for Wavedash iframe
 
       - name: Install Wavedash CLI
-        run: curl -fsSL https://wavedash.com/cli/install.sh | sh
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/wvdsh/cli/releases/latest/download/wavedash-installer.sh | sh
+          wavedash --version
 
       - name: Validate Wavedash settings
         env:
