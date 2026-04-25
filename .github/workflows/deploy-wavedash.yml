@@ -37,4 +37,4 @@ jobs:
       - name: Deploy to Wavedash
         run: wavedash build push
         env:
-          WAVEDASH_API_KEY: ${{ secrets.WAVEDASH_API_KEY }}
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_API_KEY }}
