@@ -435,8 +435,8 @@ export class GameScene extends Phaser.Scene {
     slab(W * 0.50, 3020, 36, T, THEME.palette.ice,   505);
 
     // Dial-face arc — three platforms descending like gauge markings
-    slab(W * 0.15, 2870, 40, T, THEME.palette.stone, 507);
-    slab(W * 0.85, 2740, 40, T, THEME.palette.stone, 509);
+    slab(W * 0.25, 2870, 40, T, THEME.palette.stone, 507);
+    slab(W * 0.75, 2740, 40, T, THEME.palette.stone, 509);
 
     // Bullseye — the precision target (28px landing!)
     slab(W * 0.50, 2600, 28, T, THEME.palette.ice,   511);
