@@ -5,6 +5,8 @@ name: Deploy to Wavedash
 #
 # Required secret:
 #   WAVEDASH_API_KEY — your Wavedash API key (starts with wd_)
+# Optional secret:
+#   WAVEDASH_GAME_ID — overrides game_id in wavedash.toml (useful for forks/environments)
 #
 # Config is read from wavedash.toml (game_id + upload_dir).
 
@@ -33,6 +35,23 @@ jobs:
 
       - name: Install Wavedash CLI
         run: curl -fsSL https://wavedash.com/cli/install.sh | sh
+
+      - name: Validate Wavedash settings
+        env:
+          WAVEDASH_TOKEN: ${{ secrets.WAVEDASH_TOKEN || secrets.WAVEDASH_API_KEY }}
+          WAVEDASH_GAME_ID: ${{ secrets.WAVEDASH_GAME_ID }}
+        run: |
+          if [ -z "$WAVEDASH_TOKEN" ]; then
+            echo "::error::Missing WAVEDASH_TOKEN (or WAVEDASH_API_KEY) secret."
+            exit 1
+          fi
+
+          if [ -n "$WAVEDASH_GAME_ID" ]; then
+            sed -i "s/^game_id = .*/game_id = \"$WAVEDASH_GAME_ID\"/" wavedash.toml
+          fi
+
+          echo "Using wavedash.toml target:"
+          cat wavedash.toml
 
       - name: Authenticate Wavedash CLI
         env:

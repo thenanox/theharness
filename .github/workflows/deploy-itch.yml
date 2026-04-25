@@ -40,6 +40,7 @@ jobs:
           unzip -o butler.zip -d butler-bin
           BUTLER_BIN=$(find butler-bin -type f -name butler | head -n 1)
           chmod +x "$BUTLER_BIN"
+          export PATH="$PWD/$(dirname "$BUTLER_BIN"):$PATH"
           echo "$PWD/$(dirname "$BUTLER_BIN")" >> "$GITHUB_PATH"
           butler -V
 
