@@ -1,0 +1,40 @@
+name: Deploy to Wavedash
+
+# Builds and pushes dist/ to Wavedash on every push to main.
+# Also triggerable manually from the Actions tab.
+#
+# Required secret:
+#   WAVEDASH_API_KEY — your Wavedash API key (starts with wd_)
+#
+# Config is read from wavedash.toml (game_id + upload_dir).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        # VITE_BASE defaults to './' — correct for Wavedash iframe
+
+      - name: Install Wavedash CLI
+        run: npm install -g @wavedash/cli
+
+      - name: Deploy to Wavedash
+        run: wavedash build push
+        env:
+          WAVEDASH_API_KEY: ${{ secrets.WAVEDASH_API_KEY }}
